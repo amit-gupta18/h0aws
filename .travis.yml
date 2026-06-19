@@ -1,0 +1,33 @@
+language: node_js
+node_js:
+  - "20"
+
+# Travis CI is a build gate only.
+# Vercel and Render deploy automatically via their own GitHub integrations on merge to main.
+# If either build job fails, the PR cannot be merged (enforced via GitHub branch protection).
+branches:
+  except:
+    - /^dependabot\/.*/
+
+jobs:
+  include:
+    - stage: build
+      name: "Server — TypeScript"
+      before_install:
+        - cd server
+      install:
+        - npm install
+      script:
+        - npm run build
+
+    - stage: build
+      name: "Client — Next.js"
+      before_install:
+        - cd client
+      install:
+        - npm install
+      script:
+        - npm run build
+
+notifications:
+  email: true
