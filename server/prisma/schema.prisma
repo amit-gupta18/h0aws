@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum GstinType {
+  REGULAR
+  COMPOSITION
+  UNREGISTERED
+}
+
+enum MemberRole {
+  OWNER
+  ACCOUNTANT
+  VIEWER
+}
+
+enum InventoryTxType {
+  OPENING_STOCK
+  PURCHASE
+  SALE
+  MANUAL_ADJUSTMENT
+}
+
+enum DocumentType {
+  TAX_INVOICE
+  BILL_OF_SUPPLY
+}
+
+enum TransactionType {
+  INTRA_STATE
+  INTER_STATE
+}
+
+enum InvoiceStatus {
+  ISSUED
+  CANCELLED
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CARD
+  CREDIT
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  phone        String?
+  passwordHash String
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  memberships         BusinessMember[]
+  inventoryActions    InventoryTransaction[]
+  invoicesCreated     Invoice[]
+  expensesCreated     Expense[]
+}
+
+model Business {
+  id            String    @id @default(uuid())
+  tradeName     String
+  legalName     String?
+  gstin         String?
+  gstinType     GstinType @default(UNREGISTERED)
+  address       String?
+  stateCode     String
+  phone         String?
+  logoUrl       String?
+  invoicePrefix String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  members              BusinessMember[]
+  locations            Location[]
+  products             Product[]
+  customers            Customer[]
+  invoiceSequence      InvoiceSequence?
+  invoices             Invoice[]
+  inventoryTransactions InventoryTransaction[]
+  expenses             Expense[]
+}
+
+model BusinessMember {
+  id         String     @id @default(uuid())
+  userId     String
+  businessId String
+  role       MemberRole
+  createdAt  DateTime   @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([userId, businessId])
+}
+
+// Auto-created on signup. No UI in V1.
+model Location {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String   @default("Main Shop")
+  createdAt  DateTime @default(now())
+
+  business  Business    @relation(fields: [businessId], references: [id])
+  inventory Inventory[]
+}
+
+model Product {
+  id           String    @id @default(uuid())
+  businessId   String
+  name         String
+  sku          String?
+  hsnCode      String?
+  gstRate      Decimal   @db.Decimal(5, 2)
+  unit         String
+  sellingPrice Decimal   @db.Decimal(12, 2)
+  category     String?
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  business              Business               @relation(fields: [businessId], references: [id])
+  inventory             Inventory[]
+  inventoryTransactions InventoryTransaction[]
+  saleItems             SaleItem[]
+
+  @@unique([businessId, sku])
+}
+
+model Inventory {
+  id         String   @id @default(uuid())
+  productId  String
+  locationId String
+  quantity   Decimal  @db.Decimal(10, 3)
+  updatedAt  DateTime @updatedAt
+
+  product  Product  @relation(fields: [productId], references: [id])
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@unique([productId, locationId])
+}
+
+// + quantityChange = stock in, - = stock out
+model InventoryTransaction {
+  id             String          @id @default(uuid())
+  productId      String
+  businessId     String
+  quantityChange Decimal         @db.Decimal(10, 3)
+  type           InventoryTxType
+  sourceId       String?         // invoice id or purchase id depending on type
+  performedById  String
+  notes          String?
+  createdAt      DateTime        @default(now())
+
+  product     Product  @relation(fields: [productId], references: [id])
+  business    Business @relation(fields: [businessId], references: [id])
+  performedBy User     @relation(fields: [performedById], references: [id])
+}
+
+model Customer {
+  id             String    @id @default(uuid())
+  businessId     String
+  name           String
+  phone          String?
+  email          String?
+  gstin          String?
+  stateCode      String?
+  billingAddress String?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id])
+  invoices Invoice[]
+}
+
+// Atomic counter — numbers are never reused, CANCELLED invoices keep their number
+model InvoiceSequence {
+  businessId String  @id
+  prefix     String
+  currentVal Int     @default(0)
+
+  business Business @relation(fields: [businessId], references: [id])
+}
+
+model Invoice {
+  id              String          @id @default(uuid())
+  businessId      String
+  customerId      String?
+  createdById     String
+  clientBillId    String          @unique
+  invoiceNumber   String
+  documentType    DocumentType
+  transactionType TransactionType
+  subtotal        Decimal         @db.Decimal(12, 2)
+  discount        Decimal         @db.Decimal(12, 2) @default(0)
+  taxableAmount   Decimal         @db.Decimal(12, 2)
+  cgstTotal       Decimal         @db.Decimal(12, 2) @default(0)
+  sgstTotal       Decimal         @db.Decimal(12, 2) @default(0)
+  igstTotal       Decimal         @db.Decimal(12, 2) @default(0)
+  grandTotal      Decimal         @db.Decimal(12, 2)
+  status          InvoiceStatus   @default(ISSUED)
+  tags            String?
+  pdfUrl          String?
+  createdAt       DateTime        @default(now())
+
+  business   Business   @relation(fields: [businessId], references: [id])
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  createdBy  User       @relation(fields: [createdById], references: [id])
+  saleItems  SaleItem[]
+  payments   Payment[]
+
+  @@unique([businessId, invoiceNumber])
+}
+
+// Snapshot fields preserve product details at time of sale even if product is later edited
+model SaleItem {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  productId    String?
+  nameSnapshot String
+  hsnSnapshot  String?
+  unitSnapshot String
+  unitPrice    Decimal  @db.Decimal(12, 2)
+  quantity     Decimal  @db.Decimal(10, 3)
+  discount     Decimal  @db.Decimal(12, 2) @default(0)
+  gstRate      Decimal  @db.Decimal(5, 2)
+  taxableValue Decimal  @db.Decimal(12, 2)
+  cgstAmount   Decimal  @db.Decimal(12, 2) @default(0)
+  sgstAmount   Decimal  @db.Decimal(12, 2) @default(0)
+  igstAmount   Decimal  @db.Decimal(12, 2) @default(0)
+  lineTotal    Decimal  @db.Decimal(12, 2)
+  sortOrder    Int
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+}
+
+// Multiple payments per invoice for partial settlements
+model Payment {
+  id          String      @id @default(uuid())
+  invoiceId   String
+  amount      Decimal     @db.Decimal(12, 2)
+  mode        PaymentMode
+  paymentDate DateTime    @db.Date
+  notes       String?
+  createdAt   DateTime    @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+}
+
+// Schema only — no UI in V1
+model Expense {
+  id          String   @id @default(uuid())
+  businessId  String
+  category    String
+  amount      Decimal  @db.Decimal(12, 2)
+  description String?
+  expenseDate DateTime @db.Date
+  createdById String
+  createdAt   DateTime @default(now())
+
+  business  Business @relation(fields: [businessId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+}
