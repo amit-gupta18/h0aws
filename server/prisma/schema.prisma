@@ -65,6 +65,7 @@ model User {
   inventoryActions    InventoryTransaction[]
   invoicesCreated     Invoice[]
   expensesCreated     Expense[]
+  refreshTokens       RefreshToken[]
 }
 
 model Business {
@@ -274,4 +275,15 @@ model Expense {
 
   business  Business @relation(fields: [businessId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  token      String   @unique
+  deviceInfo String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  user User @relation(fields: [userId], references: [id])
 }
