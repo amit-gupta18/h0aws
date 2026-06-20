@@ -52,6 +52,18 @@ model RefreshToken {
 
 ### POST /auth/signup
 
+```
+const accessToken = jwt.sign(
+  { 
+    userId: user.id,
+    businessId: member.businessId,
+    role: member.role 
+  },
+  JWT_SECRET,
+  { expiresIn: '1h' }
+)
+```
+
 **Request body:**
 ```json
 {
@@ -60,6 +72,8 @@ model RefreshToken {
   "password": "min8chars"
 }
 ```
+
+
 
 **Response 201:**
 ```json
