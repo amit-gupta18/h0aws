@@ -14,8 +14,9 @@ Rakhat is a GST billing SaaS for Indian SMBs. A shop owner signs up, creates the
 | Layer | Technology | Why |
 |---|---|---|
 | Frontend | Next.js 16, Tailwind v4, shadcn/ui | App Router, server components, edge-ready |
-| State | Zustand | Lightweight, works outside React components (needed for API client hooks) |
-| HTTP client | ky | Zero-dependency, native fetch, typed hook API |
+| Server state | TanStack Query v5 | Caching, background refetch, loading/error states for all API data |
+| Client state | Zustand | Session + active business — works outside React (needed by ky hooks) |
+| HTTP client | ky | Zero-dependency, native fetch, typed hook API with auth interceptors |
 | Backend | Express 5, TypeScript ESM | Mature, simple, `nodenext` modules |
 | ORM | Prisma 7 | Type-safe, `@prisma/adapter-pg` for Aurora SSL |
 | Database | Amazon Aurora PostgreSQL Serverless v2 | Auto-scales to zero, prod-ready |
@@ -92,6 +93,39 @@ BusinessMember = which users belong to which tenant, and as what role
                                Business + BusinessMember(OWNER)
                                + Location("Main Shop") + InvoiceSequence
 3. → /dashboard             (now has one membership, auto-selected)
+```
+
+---
+
+## State management
+
+Two layers, no overlap:
+
+| Layer | Tool | What it owns |
+|---|---|---|
+| Server state | TanStack Query | All API data — invoices, customers, inventory, etc. Handles caching, background refetch, loading + error states. |
+| Client state | Zustand | Session only — `userId`, `email`, `accessToken`, `memberships[]`, `activeBusinessId`. Lives in memory (no persistence needed — `SessionProvider` rehydrates from the httpOnly cookie on every load). |
+
+**How they connect:**
+
+```
+ky interceptors (lib/api.ts)
+  → beforeRequest: read accessToken + activeBusinessId from Zustand → attach as headers
+  → afterResponse: on 401, call /auth/refresh, update Zustand, retry request
+
+TanStack Query
+  → useQuery / useMutation call api.get() / api.post() (the ky instance)
+  → gets caching, deduplication, background refetch, loading states for free
+  → DevTools available in development
+```
+
+Usage pattern:
+```typescript
+// in any page or component
+const { data, isLoading } = useQuery({
+  queryKey: ['invoices', activeBusinessId],
+  queryFn: () => api.get('invoices').json<Invoice[]>(),
+})
 ```
 
 ---
