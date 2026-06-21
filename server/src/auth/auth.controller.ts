@@ -59,7 +59,7 @@ export const AuthController = {
     try {
       const result = await AuthService.refresh(raw, req.headers["user-agent"]);
       res.cookie("refreshToken", result.refreshToken, COOKIE_OPTS);
-      res.json({ accessToken: result.accessToken });
+      res.json({ accessToken: result.accessToken, user: result.user, memberships: result.memberships });
     } catch (err) {
       handleError(err, res);
     }
