@@ -1,18 +1,16 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import type { MemberRole } from "@prisma/client";
 
+/** The access token proves identity only — no business/role is encoded. */
 export interface AuthPayload {
   userId: string;
   email: string;
-  businessId: string | null;
-  role: MemberRole | null;
 }
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers["authorization"];
   if (!header?.startsWith("Bearer ")) {
-    res.status(401).json({ message: "Unauthorized" });
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
   const token = header.slice(7);
@@ -21,6 +19,6 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     req.user = payload;
     next();
   } catch {
-    res.status(401).json({ message: "Invalid or expired token" });
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 }

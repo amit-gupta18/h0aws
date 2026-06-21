@@ -9,9 +9,13 @@ export const api = ky.create({
   hooks: {
     beforeRequest: [
       ({ request }: BeforeRequestState) => {
-        const token = useAuthStore.getState().accessToken
-        if (token) {
-          request.headers.set('Authorization', `Bearer ${token}`)
+        const { accessToken, activeBusinessId } = useAuthStore.getState()
+        if (accessToken) {
+          request.headers.set('Authorization', `Bearer ${accessToken}`)
+        }
+        // Tells the server which tenant this request acts on; role is resolved server-side.
+        if (activeBusinessId) {
+          request.headers.set('X-Business-Id', activeBusinessId)
         }
       },
     ],

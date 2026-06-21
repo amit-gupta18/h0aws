@@ -1,101 +1,76 @@
-# Auth — plan.md
-**Feature:** Authentication  
-**Status:** Ready for implementation  
+# Auth — API Reference
+**Status:** Implemented  
 **Last Updated:** June 2026
 
 ---
 
-## 1. Prisma Schema
+## Design principle
 
-```prisma
-model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  phone        String?   @unique
-  passwordHash String
-  isActive     Boolean   @default(true)
-  deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  refreshTokens RefreshToken[]
-  businessMembers BusinessMember[]
-}
-
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  deviceInfo String?
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-
-  user User @relation(fields: [userId], references: [id])
-}
-```
-
-**Notes:**
-- OTP and reset tokens are NOT in the DB — stored in Redis with TTL
-- One `RefreshToken` row per device per user — supports multi-device login
-- `token` stored as hashed value (bcrypt or SHA-256) — never raw
+Auth is identity only. The access token proves *who you are* (`userId`, `email`) — not what business you belong to or what role you have. Tenant + role are resolved per-request by the `businessContext` middleware from the `X-Business-Id` header. This means role changes and membership removals take effect immediately, with no stale-JWT window.
 
 ---
 
-## 2. API Contracts
+## Token model
 
-### Base URL
+| Token | Lifetime | Client storage | Server storage |
+|---|---|---|---|
+| Access token | 1 hour | Zustand (memory) | Nowhere — stateless JWT |
+| Refresh token | 7 days | httpOnly cookie (set by Express) | DB — SHA-256 hash in `RefreshToken` table |
+| OTP | 10 min | — | Redis — TTL auto-deletes |
+| Reset token | 10 min | Client memory | Redis — TTL auto-deletes |
+
+**Refresh token rotation:** every `/auth/refresh` deletes the old row and creates a new one. A stolen token is detected the moment the legitimate user tries to refresh — the consumed token is gone.
+
+---
+
+## JWT payload
+
+```typescript
+{
+  userId: string   // User.id
+  email:  string   // User.email
+}
 ```
-/api/v1/auth
-```
+
+Business and role are **not** in the token. They are resolved on every request from `BusinessMember` using the `X-Business-Id` header.
+
+---
+
+## Endpoints
+
+Base URL: `/api/v1/auth`
 
 ---
 
 ### POST /auth/signup
 
-```
-const accessToken = jwt.sign(
-  { 
-    userId: user.id,
-    businessId: member.businessId,
-    role: member.role 
-  },
-  JWT_SECRET,
-  { expiresIn: '1h' }
-)
-```
+Creates a User (identity only). No business, no membership. Response includes an empty `memberships` array — the client routes the user to `/onboarding` to create their business.
 
-**Request body:**
+**Request**
 ```json
 {
   "email": "amit@example.com",
-  "phone": "9876543210",
-  "password": "min8chars"
+  "password": "min8chars",
+  "phone": "9876543210"   // optional
 }
 ```
 
-
-
-**Response 201:**
+**Response 201**
 ```json
 {
   "accessToken": "<jwt>",
-  "user": {
-    "id": "uuid",
-    "email": "amit@example.com"
-  }
+  "user": { "id": "uuid", "email": "amit@example.com" },
+  "memberships": []
 }
 ```
 
-**Side effects:**
-- Creates `User` row
-- Creates `RefreshToken` row in DB
-- Sets refresh token in httpOnly cookie
+**Side effects:** creates `User`, creates `RefreshToken` row, sets `refreshToken` httpOnly cookie.
 
 ---
 
 ### POST /auth/login
 
-**Request body:**
+**Request**
 ```json
 {
   "email": "amit@example.com",
@@ -103,111 +78,95 @@ const accessToken = jwt.sign(
 }
 ```
 
-**Response 200:**
+**Response 200**
 ```json
 {
   "accessToken": "<jwt>",
-  "user": {
-    "id": "uuid",
-    "email": "amit@example.com"
-  }
+  "user": { "id": "uuid", "email": "amit@example.com" },
+  "memberships": [
+    { "businessId": "uuid", "tradeName": "Sharma Traders", "role": "OWNER" },
+    { "businessId": "uuid", "tradeName": "Gupta Stores", "role": "ACCOUNTANT" }
+  ]
 }
 ```
 
-**Side effects:**
-- Verifies password hash
-- Generates new refresh token for this device
-- Saves new refresh token row to DB (old device tokens untouched)
-- Sets refresh token in httpOnly cookie
+`memberships` is ordered by `createdAt asc`. Client auto-selects when exactly one exists. Multiple memberships → show business switcher.
+
+**Side effects:** creates `RefreshToken` row, sets httpOnly cookie.
 
 ---
 
 ### POST /auth/refresh
 
-**Request:** No body — refresh token comes automatically via httpOnly cookie
+No body — refresh token comes via httpOnly cookie automatically.
 
-**Response 200:**
+**Response 200**
 ```json
-{
-  "accessToken": "<new jwt>"
-}
+{ "accessToken": "<new jwt>" }
 ```
 
-**Response 401:** If refresh token not found in DB, expired, or invalid
+**Response 401** — token not in DB, expired, or already consumed (rotation).
 
-**Side effects (refresh token rotation):**
-- Deletes old refresh token row from DB
-- Creates new refresh token row in DB
-- Sets new refresh token in httpOnly cookie
+**Side effects:** deletes old `RefreshToken` row, creates new one, sets new httpOnly cookie.
 
 ---
 
 ### POST /auth/logout
 
-**Request:** No body — refresh token comes via httpOnly cookie
+Requires `authenticate` middleware (Bearer token).
 
-**Response 200:**
+**Response 200**
 ```json
 { "message": "Logged out" }
 ```
 
-**Side effects:**
-- Deletes that device's refresh token row from DB
-- Clears httpOnly cookie on client
-- Access token lives out its remaining lifetime (max 1 hour) — acceptable for V1
+**Side effects:** deletes this device's `RefreshToken` row, clears cookie. Other devices unaffected.
 
 ---
 
 ### POST /auth/forgot-password
 
-**Request body:**
+Rate limited: 5 requests / 15 min.
+
+**Request**
 ```json
-{
-  "phone": "9876543210"
-}
+{ "phone": "9876543210" }
 ```
 
-**Response 200:**
+**Response 200**
 ```json
-{ "message": "OTP sent" }
+{ "message": "If that phone is registered, an OTP has been sent" }
 ```
 
-**Side effects:**
-- Generates 6-digit OTP
-- Stores in Redis: key `otp:{phone}`, value `{otp}`, TTL 10 minutes
-- Sends OTP via SMS (V1: use any SMS provider)
+Silent — same response whether phone exists or not (don't reveal registration status).
+
+**Side effects:** stores OTP in Redis at `otp:{phone}` with 10-min TTL. SMS send is a TODO placeholder — logs to console in dev.
 
 ---
 
 ### POST /auth/verify-otp
 
-**Request body:**
+Rate limited: 10 requests / 15 min.
+
+**Request**
 ```json
-{
-  "phone": "9876543210",
-  "otp": "482910"
-}
+{ "phone": "9876543210", "otp": "482910" }
 ```
 
-**Response 200:**
+**Response 200**
 ```json
-{
-  "resetToken": "<short lived token>"
-}
+{ "resetToken": "<short-lived token>" }
 ```
 
-**Response 400:** OTP invalid or expired
+**Response 400** — OTP invalid or expired.
 
-**Side effects:**
-- Looks up `otp:{phone}` in Redis
-- If match: deletes OTP from Redis, generates reset token
-- Stores in Redis: key `reset:{resetToken}`, value `{userId}`, TTL 10 minutes
+**Side effects:** deletes OTP from Redis, stores reset token in Redis at `reset:{resetToken}` with 10-min TTL, value is `userId`.
 
 ---
 
 ### POST /auth/reset-password
 
-**Request body:**
+**Request**
 ```json
 {
   "resetToken": "<token from verify-otp>",
@@ -215,144 +174,38 @@ const accessToken = jwt.sign(
 }
 ```
 
-**Response 200:**
+**Response 200**
 ```json
 { "message": "Password updated" }
 ```
 
-**Side effects:**
-- Looks up `reset:{resetToken}` in Redis → gets userId
-- Deletes reset token from Redis
-- Updates `User.passwordHash`
-- Deletes ALL `RefreshToken` rows for that user (invalidates all devices)
+**Side effects:** deletes reset token from Redis, updates `User.passwordHash`, deletes ALL `RefreshToken` rows for that user (kicks all devices).
 
 ---
 
-## 3. Zod Validation Schemas
+## File map
 
-```typescript
-// shared/schemas/auth.ts
-
-export const SignupSchema = z.object({
-  email: z.string().email(),
-  phone: z.string().regex(/^[6-9]\d{9}$/).optional(),
-  password: z.string().min(8),
-})
-
-export const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-})
-
-export const ForgotPasswordSchema = z.object({
-  phone: z.string().regex(/^[6-9]\d{9}$/),
-})
-
-export const VerifyOtpSchema = z.object({
-  phone: z.string().regex(/^[6-9]\d{9}$/),
-  otp: z.string().length(6),
-})
-
-export const ResetPasswordSchema = z.object({
-  resetToken: z.string().min(1),
-  newPassword: z.string().min(8),
-})
+```
+server/src/auth/
+  auth.schema.ts      ← Zod: SignupSchema, LoginSchema, ForgotPasswordSchema, VerifyOtpSchema, ResetPasswordSchema
+  auth.service.ts     ← business logic: bcrypt, JWT sign, Redis, token generation
+  auth.controller.ts  ← HTTP: parse req, call service, set cookie, return JSON
+  auth.route.ts       ← Express router: maps paths, applies rate limiters
 ```
 
 ---
 
-## 4. Token Configuration
-
-| Token | Lifetime | Storage (client) | Storage (server) |
-|---|---|---|---|
-| Access token | 1 hour | Memory (JS variable) | Nowhere (stateless JWT) |
-| Refresh token | 7 days | httpOnly cookie | DB (RefreshToken table) |
-| OTP | 10 minutes | — | Redis (TTL auto-deletes) |
-| Reset token | 10 minutes | Client memory | Redis (TTL auto-deletes) |
-
----
-
-## 5. Decisions & Reasoning
-
-**Why two tokens instead of one long-lived JWT?**  
-Single long-lived JWT cannot be invalidated without a blocklist. Two tokens give short exposure window on access token and controlled invalidation via refresh token in DB.
-
-**Why httpOnly cookie for refresh token?**  
-JavaScript cannot read httpOnly cookies — XSS attacks cannot steal the refresh token. Access token in memory is fine because it's short-lived (1 hour max damage window).
-
-**Why refresh token rotation?**  
-Every `/auth/refresh` call generates a new refresh token and deletes the old one. If a stolen refresh token is used, the legitimate user's next refresh attempt fails (token already consumed), alerting them to the breach.
-
-**Why one RefreshToken row per device?**  
-Supports multi-device login. Logout on one device doesn't kick other devices. "Logout all devices" deletes all rows for that userId.
-
-**Why Redis for OTP and reset token?**  
-Both are short-lived and temporary. Storing in DB accumulates junk that needs cleanup jobs. Redis TTL handles expiry automatically — key disappears after 10 minutes with zero extra work.
-
-**Why invalidate all refresh tokens on password reset?**  
-If a device is stolen, the user changes password to kick out all sessions. All RefreshToken rows deleted — every device must log in again with new credentials.
-
----
-
-## 6. Edge Cases
+## Edge cases
 
 | Case | Handling |
 |---|---|
 | Signup with existing email | 409 Conflict |
-| Login with wrong password | 401, generic message (don't reveal if email exists) |
-| Refresh token not in DB | 401 — force login |
-| Refresh token expired | 401 — force login |
-| OTP expired (>10 min) | 400 — Redis TTL has deleted it, lookup fails |
-| OTP wrong | 400 — do not reveal remaining attempts in V1 |
-| Reset token expired | 400 — user must restart forgot-password flow |
-| Logout with no cookie | 200 — idempotent, nothing to delete |
-| User is inactive (isActive=false) | 401 on login |
-| User soft deleted (deletedAt set) | 401 on login |
-
----
-
-## 7. Implementation Checklist
-
-### Prisma
-- [ ] Add `User` model to schema.prisma
-- [ ] Add `RefreshToken` model to schema.prisma
-- [ ] Run `prisma migrate dev`
-
-### Middleware
-- [ ] `authenticate` middleware — verifies access token JWT, attaches `req.user`
-- [ ] Cookie parser middleware configured for httpOnly cookies
-
-### Routes
-- [ ] `POST /auth/signup`
-- [ ] `POST /auth/login`
-- [ ] `POST /auth/refresh`
-- [ ] `POST /auth/logout`
-- [ ] `POST /auth/forgot-password`
-- [ ] `POST /auth/verify-otp`
-- [ ] `POST /auth/reset-password`
-
-### Validation
-- [ ] Zod schemas in `/shared/schemas/auth.ts`
-- [ ] Validation middleware applied to all auth routes
-
-### Redis
-- [ ] OTP storage and TTL on `/forgot-password`
-- [ ] OTP lookup and deletion on `/verify-otp`
-- [ ] Reset token storage and TTL on `/verify-otp`
-- [ ] Reset token lookup and deletion on `/reset-password`
-
-### Security
-- [ ] Passwords hashed with bcrypt (cost factor 12)
-- [ ] Refresh tokens hashed before storing in DB
-- [ ] JWT signed with `JWT_SECRET` env var
-- [ ] httpOnly + Secure + SameSite=Strict on refresh token cookie
-- [ ] Rate limiting on `/forgot-password` and `/verify-otp` (prevent OTP brute force)
-
-### Testing
-- [ ] Signup happy path
-- [ ] Login happy path
-- [ ] Refresh token rotation
-- [ ] Logout clears cookie and DB row
-- [ ] Password reset full flow
-- [ ] Expired OTP returns 400
-- [ ] Stolen refresh token scenario (rotation catches it)
+| Login — wrong password | 401, generic message |
+| Login — inactive or soft-deleted user | 401 |
+| Refresh token not in DB | 401 — force re-login |
+| Refresh token expired | 401 — force re-login |
+| OTP expired | 400 — Redis TTL deleted it |
+| Wrong OTP | 400 |
+| Reset token expired | 400 — restart forgot-password flow |
+| Logout with no cookie | 200 — idempotent |
+| Stolen refresh token used | Legitimate user's next refresh 401s (token already consumed by attacker) |
