@@ -3,60 +3,23 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { HTTPError } from 'ky'
-import { api } from '@/lib/api'
-import { useAuthStore } from '@/store/authStore'
-import type { Membership } from '@/shared/types'
+import { useSignup } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-
-type SignupResponse = {
-  accessToken: string
-  user: { id: string; email: string }
-  memberships: Membership[]
-}
 
 export default function SignupPage() {
   const router = useRouter()
-  const setSession = useAuthStore((s) => s.setSession)
+  const signup = useSignup()
 
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    try {
-      const body: Record<string, string> = { email, password }
-      if (phone) body['phone'] = phone
-
-      const data = await api
-        .post('auth/signup', { json: body, credentials: 'include' })
-        .json<SignupResponse>()
-
-      setSession({
-        userId: data.user.id,
-        email: data.user.email,
-        accessToken: data.accessToken,
-        memberships: data.memberships,
-      })
-
-      // New users always go to onboarding — they have no business yet.
-      router.push('/onboarding')
-    } catch (err) {
-      if (err instanceof HTTPError) {
-        const body = await err.response.json<{ error?: string }>().catch((): { error?: string } => ({}))
-        setError(body.error ?? 'Signup failed')
-      } else {
-        setError('Could not reach the server')
-      }
-    } finally {
-      setLoading(false)
-    }
+    const body: { email: string; password: string; phone?: string } = { email, password }
+    if (phone) body.phone = phone
+    await signup.mutateAsync(body)
+    router.push('/onboarding')
   }
 
   return (
@@ -117,14 +80,14 @@ export default function SignupPage() {
             />
           </div>
 
-          {error && (
+          {signup.error && (
             <p className="text-sm text-danger bg-danger-subtle border border-danger/20 rounded-md px-3 py-2">
-              {error}
+              {signup.error.message}
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Creating account…' : 'Create account'}
+          <Button type="submit" className="w-full" disabled={signup.isPending}>
+            {signup.isPending ? 'Creating account…' : 'Create account'}
           </Button>
         </form>
 
