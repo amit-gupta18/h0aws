@@ -114,7 +114,12 @@ export const AuthService = {
     return { accessToken, refreshToken, user: { id: user.id, email: user.email }, memberships };
   },
 
-  async refresh(rawToken: string, deviceInfo?: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async refresh(rawToken: string, deviceInfo?: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: { id: string; email: string };
+    memberships: Membership[];
+  }> {
     const hashed = hashToken(rawToken);
     const stored = await prisma.refreshToken.findUnique({ where: { token: hashed } });
 
@@ -131,8 +136,9 @@ export const AuthService = {
 
     const accessToken = signAccessToken({ userId: user.id, email: user.email });
     const refreshToken = await persistRefreshToken(user.id, deviceInfo);
+    const memberships = await getMemberships(user.id);
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, user, memberships };
   },
 
   async logout(rawToken: string): Promise<void> {

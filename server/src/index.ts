@@ -1,16 +1,14 @@
-if (process.env["NODE_ENV"] !== "production") {
-  await import("dotenv/config");
-}
-
 import express from "express";
+import cors from "cors";
 import cookieParser from "cookie-parser";
 import { prisma } from "./lib/prisma.js";
 import { authRouter } from "./auth/auth.route.js";
 import { businessRouter } from "./business/business.route.js";
 
 const app = express();
-const PORT = process.env["PORT"] ?? 3000;
+const PORT = process.env["PORT"] ?? 3001;
 
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 

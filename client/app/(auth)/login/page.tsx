@@ -3,55 +3,20 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { HTTPError } from 'ky'
-import { api } from '@/lib/api'
-import { useAuthStore } from '@/store/authStore'
-import type { Membership } from '@/shared/types'
+import { useLogin } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-
-type LoginResponse = {
-  accessToken: string
-  user: { id: string; email: string }
-  memberships: Membership[]
-}
 
 export default function LoginPage() {
   const router = useRouter()
-  const setSession = useAuthStore((s) => s.setSession)
+  const login = useLogin()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    try {
-      const data = await api
-        .post('auth/login', { json: { email, password }, credentials: 'include' })
-        .json<LoginResponse>()
-
-      setSession({
-        userId: data.user.id,
-        email: data.user.email,
-        accessToken: data.accessToken,
-        memberships: data.memberships,
-      })
-
-      router.push(data.memberships.length > 0 ? '/dashboard' : '/onboarding')
-    } catch (err) {
-      if (err instanceof HTTPError) {
-        const body = await err.response.json<{ error?: string }>().catch((): { error?: string } => ({}))
-        setError(body.error ?? 'Login failed')
-      } else {
-        setError('Could not reach the server')
-      }
-    } finally {
-      setLoading(false)
-    }
+    const data = await login.mutateAsync({ email, password })
+    router.push(data.memberships.length > 0 ? '/dashboard' : '/onboarding')
   }
 
   return (
@@ -80,9 +45,14 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground" htmlFor="password">
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-foreground" htmlFor="password">
+                Password
+              </label>
+              <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="password"
               type="password"
@@ -95,14 +65,14 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && (
+          {login.error && (
             <p className="text-sm text-danger bg-danger-subtle border border-danger/20 rounded-md px-3 py-2">
-              {error}
+              {login.error.message}
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign in'}
+          <Button type="submit" className="w-full" disabled={login.isPending}>
+            {login.isPending ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
 

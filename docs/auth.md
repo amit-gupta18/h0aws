@@ -4,6 +4,244 @@
 
 ---
 
+## Sequence diagrams
+
+### 1. Signup + onboarding (new user, first time)
+
+```
+Browser          Next.js         Express         Aurora (DB)       Redis
+   |                |               |                 |               |
+   |  POST /auth/signup             |                 |               |
+   |--------------->|               |                 |               |
+   |                | POST /api/v1/auth/signup         |               |
+   |                |-------------->|                 |               |
+   |                |               | findUnique(email)|               |
+   |                |               |---------------->|               |
+   |                |               |<-- null --------|               |
+   |                |               | bcrypt.hash()   |               |
+   |                |               | user.create()   |               |
+   |                |               |---------------->|               |
+   |                |               |<-- User --------|               |
+   |                |               | refreshToken.create()           |
+   |                |               |---------------->|               |
+   |                |               | signJWT()       |               |
+   |                | 201 { accessToken, user,         |               |
+   |                |       memberships: [] }          |               |
+   |                |       Set-Cookie: refreshToken   |               |
+   |                |<--------------|                 |               |
+   | redirect /onboarding           |                 |               |
+   |<---------------|               |                 |               |
+   |                |               |                 |               |
+   |  POST /businesses              |                 |               |
+   |--------------->|               |                 |               |
+   |                | POST /api/v1/businesses          |               |
+   |                | (Bearer accessToken +            |               |
+   |                |  X-Business-Id: not needed yet)  |               |
+   |                |-------------->|                 |               |
+   |                |               | verifyJWT()     |               |
+   |                |               | $transaction {  |               |
+   |                |               |   business.create()             |
+   |                |               |   businessMember.create(OWNER)  |
+   |                |               |   location.create("Main Shop")  |
+   |                |               |   invoiceSequence.create()      |
+   |                |               | }               |               |
+   |                |               |---------------->|               |
+   |                |               |<-- { business, membership }     |
+   |                | 201 { membership }               |               |
+   |                |<--------------|                 |               |
+   | addMembership() → Zustand      |                 |               |
+   | redirect /dashboard            |                 |               |
+   |<---------------|               |                 |               |
+```
+
+---
+
+### 2. Login (returning user)
+
+```
+Browser          Next.js         Express         Aurora (DB)
+   |                |               |                 |
+   |  POST /auth/login              |                 |
+   |--------------->|               |                 |
+   |                | POST /api/v1/auth/login          |
+   |                |-------------->|                 |
+   |                |               | findUnique(email)|
+   |                |               |---------------->|
+   |                |               |<-- User --------|
+   |                |               | bcrypt.compare()|
+   |                |               | findMany BusinessMember (for userId)
+   |                |               |---------------->|
+   |                |               |<-- memberships--|
+   |                |               | refreshToken.create()
+   |                |               |---------------->|
+   |                |               | signJWT()       |
+   |                | 200 { accessToken, user,         |
+   |                |       memberships: [...] }       |
+   |                |       Set-Cookie: refreshToken   |
+   |                |<--------------|                 |
+   | setSession() → Zustand         |                 |
+   | memberships.length === 1       |                 |
+   |   → redirect /dashboard        |                 |
+   | memberships.length > 1         |                 |
+   |   → show business switcher     |                 |
+   | memberships.length === 0       |                 |
+   |   → redirect /onboarding       |                 |
+   |<---------------|               |                 |
+```
+
+---
+
+### 3. Page refresh — session restore (SessionProvider)
+
+```
+Browser          SessionProvider    Express         Aurora (DB)
+   |                |               |                 |
+   | app mounts     |               |                 |
+   |--------------->|               |                 |
+   | accessToken === null in Zustand|                 |
+   |                | POST /auth/refresh               |
+   |                | (cookie sent automatically)     |
+   |                |-------------->|                 |
+   |                |               | read refreshToken cookie
+   |                |               | findUnique(SHA-256 hash)
+   |                |               |---------------->|
+   |                |               |<-- RefreshToken-|
+   |                |               | delete old row  |
+   |                |               |---------------->|
+   |                |               | create new row (rotation)
+   |                |               |---------------->|
+   |                |               | findMany BusinessMember
+   |                |               |---------------->|
+   |                |               |<-- memberships--|
+   |                |               | signJWT()       |
+   |                | 200 { accessToken, user,         |
+   |                |       memberships: [...] }       |
+   |                |       Set-Cookie: refreshToken (new, rotated)
+   |                |<--------------|                 |
+   | setSession() → Zustand rehydrated               |
+   | page renders normally          |                 |
+   |<---------------|               |                 |
+   |                |               |                 |
+   |         [if refresh fails]     |                 |
+   |                | 401           |                 |
+   |                |<--------------|                 |
+   | clearAuth() → Zustand cleared  |                 |
+   | proxy.ts sees no refreshToken cookie             |
+   |   → redirect /login            |                 |
+```
+
+---
+
+### 4. Authenticated API request (normal flow)
+
+```
+Browser          ky (lib/api.ts)   Express              Aurora (DB)
+   |                |               |                       |
+   | api.get('invoices')            |                       |
+   |--------------->|               |                       |
+   | beforeRequest hook:            |                       |
+   |   set Authorization: Bearer <accessToken>             |
+   |   set X-Business-Id: <activeBusinessId>               |
+   |                |-------------->|                       |
+   |                |               | authenticate()        |
+   |                |               |   verifyJWT()         |
+   |                |               |   → req.user = { userId, email }
+   |                |               | businessContext()     |
+   |                |               |   findUnique BusinessMember(userId, businessId)
+   |                |               |---------------------->|
+   |                |               |<-- { role: OWNER } ---|
+   |                |               |   → req.context = { businessId, role }
+   |                |               | requireRole() [if route needs it]
+   |                |               | controller → service  |
+   |                |               |---------------------->|
+   |                |               |<-- data --------------|
+   |                | 200 { data }  |                       |
+   |                |<--------------|                       |
+   |<---------------|               |                       |
+```
+
+---
+
+### 5. Silent token refresh (401 → retry)
+
+```
+Browser          ky (lib/api.ts)    Express
+   |                |                |
+   | api.post('invoices', ...)       |
+   |--------------->|                |
+   |                |-- POST /invoices (expired accessToken)
+   |                |--------------->|
+   |                |                | verifyJWT() → TokenExpiredError
+   |                | 401 <----------|
+   |                |                |
+   | afterResponse hook detects 401  |
+   |                | POST /auth/refresh (cookie auto-attached)
+   |                |--------------->|
+   |                |                | rotate refreshToken, signJWT()
+   |                | 200 { accessToken } <---
+   | setAccessToken() → Zustand      |
+   |                |                |
+   |                |-- POST /invoices (new accessToken, RETRY)
+   |                |--------------->|
+   |                | 200 { ... } <--|
+   | caller never sees the 401       |
+   |<---------------|                |
+```
+
+---
+
+### 6. Password reset via OTP
+
+```
+Browser          Next.js         Express              Redis
+   |                |               |                    |
+   |  POST /auth/forgot-password    |                    |
+   |  { phone }     |               |                    |
+   |--------------->|               |                    |
+   |                |-------------->|                    |
+   |                |               | findFirst(phone)   |
+   |                |               | generateOtp()      |
+   |                |               | SETEX otp:{phone} 600 <otp>
+   |                |               |------------------->|
+   |                |               | [SMS send — TODO]  |
+   |                | 200 { message }|                   |
+   |<---------------|               |                    |
+   |                |               |                    |
+   |  POST /auth/verify-otp         |                    |
+   |  { phone, otp }|               |                    |
+   |--------------->|               |                    |
+   |                |-------------->|                    |
+   |                |               | GET otp:{phone}    |
+   |                |               |------------------->|
+   |                |               |<-- stored otp -----|
+   |                |               | compare otp        |
+   |                |               | DEL otp:{phone}    |
+   |                |               |------------------->|
+   |                |               | generateResetToken()|
+   |                |               | SETEX reset:{token} 600 userId
+   |                |               |------------------->|
+   |                | 200 { resetToken }                 |
+   |<---------------|               |                    |
+   |                |               |                    |
+   |  POST /auth/reset-password     |                    |
+   |  { resetToken, newPassword }   |                    |
+   |--------------->|               |                    |
+   |                |-------------->|                    |
+   |                |               | GET reset:{token}  |
+   |                |               |------------------->|
+   |                |               |<-- userId ---------|
+   |                |               | DEL reset:{token}  |
+   |                |               |------------------->|
+   |                |               | bcrypt.hash(newPassword)
+   |                |               | user.update(passwordHash)  [Aurora]
+   |                |               | refreshToken.deleteMany(userId) [kicks all devices]
+   |                | 200 { message }|                   |
+   |<---------------|               |                    |
+   | redirect /login                |                    |
+```
+
+---
+
 ## Design principle
 
 Auth is identity only. The access token proves *who you are* (`userId`, `email`) — not what business you belong to or what role you have. Tenant + role are resolved per-request by the `businessContext` middleware from the `X-Business-Id` header. This means role changes and membership removals take effect immediately, with no stale-JWT window.
@@ -102,8 +340,16 @@ No body — refresh token comes via httpOnly cookie automatically.
 
 **Response 200**
 ```json
-{ "accessToken": "<new jwt>" }
+{
+  "accessToken": "<new jwt>",
+  "user": { "id": "uuid", "email": "amit@example.com" },
+  "memberships": [
+    { "businessId": "uuid", "tradeName": "Sharma Traders", "role": "OWNER" }
+  ]
+}
 ```
+
+Used by `SessionProvider` on every app load to rehydrate Zustand state from the httpOnly cookie — no localStorage needed.
 
 **Response 401** — token not in DB, expired, or already consumed (rotation).
 
