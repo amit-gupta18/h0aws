@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useVerifyOtp } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 
-export default function VerifyOtpPage() {
+function VerifyOtpForm() {
   const router = useRouter()
   const params = useSearchParams()
   const phone = params.get('phone') ?? ''
@@ -59,5 +59,13 @@ export default function VerifyOtpPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense>
+      <VerifyOtpForm />
+    </Suspense>
   )
 }

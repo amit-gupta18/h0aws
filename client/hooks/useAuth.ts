@@ -17,7 +17,7 @@ async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
     return await fn()
   } catch (err) {
     if (err instanceof HTTPError) {
-      const body = await err.response.json<{ error?: string }>().catch(() => ({}))
+      const body = await err.response.json<{ error?: string }>().catch((): { error?: string } => ({}))
       throw new Error(body.error ?? 'Something went wrong')
     }
     throw new Error('Could not reach the server')
