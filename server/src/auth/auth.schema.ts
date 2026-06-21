@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 export const SignupSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   phone: z.string().regex(/^[6-9]\d{9}$/).optional(),
   password: z.string().min(8),
 });
 
 export const LoginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
 });
 
