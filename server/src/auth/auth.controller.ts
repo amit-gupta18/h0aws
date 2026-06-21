@@ -8,17 +8,14 @@ import {
   ResetPasswordSchema,
 } from "./auth.schema.js";
 
+import { handleError } from "../common/errors.js";
+
 const COOKIE_OPTS = {
   httpOnly: true,
   secure: process.env["NODE_ENV"] === "production",
   sameSite: "strict" as const,
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
-
-function handleError(err: unknown, res: Response): void {
-  const e = err as Error & { status?: number };
-  res.status(e.status ?? 500).json({ error: e.message ?? "Internal server error" });
-}
 
 export const AuthController = {
   async signup(req: Request, res: Response): Promise<void> {
@@ -31,7 +28,7 @@ export const AuthController = {
       const { email, password, phone } = parsed.data;
       const result = await AuthService.signup(email, password, phone ?? null, req.headers["user-agent"]);
       res.cookie("refreshToken", result.refreshToken, COOKIE_OPTS);
-      res.status(201).json({ accessToken: result.accessToken, user: result.user });
+      res.status(201).json({ accessToken: result.accessToken, user: result.user, memberships: result.memberships });
     } catch (err) {
       handleError(err, res);
     }
@@ -47,7 +44,7 @@ export const AuthController = {
       const { email, password } = parsed.data;
       const result = await AuthService.login(email, password, req.headers["user-agent"]);
       res.cookie("refreshToken", result.refreshToken, COOKIE_OPTS);
-      res.json({ accessToken: result.accessToken, user: result.user });
+      res.json({ accessToken: result.accessToken, user: result.user, memberships: result.memberships });
     } catch (err) {
       handleError(err, res);
     }

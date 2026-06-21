@@ -78,7 +78,6 @@ model Business {
   stateCode     String
   phone         String?
   logoUrl       String?
-  invoicePrefix String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -99,10 +98,11 @@ model BusinessMember {
   role       MemberRole
   createdAt  DateTime   @default(now())
 
-  user     User     @relation(fields: [userId], references: [id])
-  business Business @relation(fields: [businessId], references: [id])
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@unique([userId, businessId])
+  @@index([businessId])
 }
 
 // Auto-created on signup. No UI in V1.
@@ -114,6 +114,8 @@ model Location {
 
   business  Business    @relation(fields: [businessId], references: [id])
   inventory Inventory[]
+
+  @@index([businessId])
 }
 
 model Product {
@@ -168,6 +170,9 @@ model InventoryTransaction {
   product     Product  @relation(fields: [productId], references: [id])
   business    Business @relation(fields: [businessId], references: [id])
   performedBy User     @relation(fields: [performedById], references: [id])
+
+  @@index([businessId])
+  @@index([productId])
 }
 
 model Customer {
@@ -185,6 +190,8 @@ model Customer {
 
   business Business @relation(fields: [businessId], references: [id])
   invoices Invoice[]
+
+  @@index([businessId])
 }
 
 // Atomic counter — numbers are never reused, CANCELLED invoices keep their number
@@ -224,6 +231,7 @@ model Invoice {
   payments   Payment[]
 
   @@unique([businessId, invoiceNumber])
+  @@index([customerId])
 }
 
 // Snapshot fields preserve product details at time of sale even if product is later edited
@@ -247,6 +255,8 @@ model SaleItem {
 
   invoice Invoice  @relation(fields: [invoiceId], references: [id])
   product Product? @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
 }
 
 // Multiple payments per invoice for partial settlements
@@ -260,6 +270,8 @@ model Payment {
   createdAt   DateTime    @default(now())
 
   invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
 }
 
 // Schema only — no UI in V1
@@ -275,6 +287,8 @@ model Expense {
 
   business  Business @relation(fields: [businessId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@index([businessId])
 }
 
 model RefreshToken {
@@ -285,5 +299,7 @@ model RefreshToken {
   createdAt  DateTime @default(now())
   expiresAt  DateTime
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

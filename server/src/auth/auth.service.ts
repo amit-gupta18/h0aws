@@ -11,17 +11,27 @@ const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const OTP_TTL_SEC = 600;
 const RESET_TTL_SEC = 600;
 
+/**
+ * Access token proves identity only. Which business the user is acting in and
+ * their role there are resolved per-request from BusinessMember — never baked
+ * into the token (keeps role/revocation changes instant).
+ */
 export interface AuthPayload {
   userId: string;
   email: string;
-  businessId: string | null;
-  role: MemberRole | null;
+}
+
+export interface Membership {
+  businessId: string;
+  tradeName: string;
+  role: MemberRole;
 }
 
 export interface AuthResult {
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string; // raw — caller sets this in cookie
   user: { id: string; email: string };
+  memberships: Membership[];
 }
 
 function generateToken(): string {
@@ -40,11 +50,17 @@ function signAccessToken(payload: AuthPayload): string {
   return jwt.sign(payload, process.env["JWT_SECRET"]!, { expiresIn: ACCESS_TOKEN_TTL });
 }
 
-async function getPrimaryMembership(userId: string): Promise<{ businessId: string; role: MemberRole } | null> {
-  return prisma.businessMember.findFirst({
+async function getMemberships(userId: string): Promise<Membership[]> {
+  const rows = await prisma.businessMember.findMany({
     where: { userId },
-    select: { businessId: true, role: true },
+    select: {
+      businessId: true,
+      role: true,
+      business: { select: { tradeName: true } },
+    },
+    orderBy: { createdAt: "asc" },
   });
+  return rows.map((r) => ({ businessId: r.businessId, tradeName: r.business.tradeName, role: r.role }));
 }
 
 async function persistRefreshToken(userId: string, deviceInfo?: string): Promise<string> {
@@ -61,6 +77,11 @@ async function persistRefreshToken(userId: string, deviceInfo?: string): Promise
 }
 
 export const AuthService = {
+  /**
+   * Identity only — creates a User and nothing else. A freshly signed-up user
+   * has zero memberships; the client routes them to business onboarding, which
+   * calls BusinessService.createWithOwner to make them an OWNER.
+   */
   async signup(email: string, password: string, phone: string | null, deviceInfo?: string): Promise<AuthResult> {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw Object.assign(new Error("Email already in use"), { status: 409 });
@@ -71,17 +92,10 @@ export const AuthService = {
       select: { id: true, email: true },
     });
 
-    const membership = await getPrimaryMembership(user.id);
-    const payload: AuthPayload = {
-      userId: user.id,
-      email: user.email,
-      businessId: membership?.businessId ?? null,
-      role: membership?.role ?? null,
-    };
-
-    const accessToken = signAccessToken(payload);
+    const accessToken = signAccessToken({ userId: user.id, email: user.email });
     const refreshToken = await persistRefreshToken(user.id, deviceInfo);
-    return { accessToken, refreshToken, user };
+
+    return { accessToken, refreshToken, user, memberships: [] };
   },
 
   async login(email: string, password: string, deviceInfo?: string): Promise<AuthResult> {
@@ -93,17 +107,11 @@ export const AuthService = {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw Object.assign(new Error("Invalid credentials"), { status: 401 });
 
-    const membership = await getPrimaryMembership(user.id);
-    const payload: AuthPayload = {
-      userId: user.id,
-      email: user.email,
-      businessId: membership?.businessId ?? null,
-      role: membership?.role ?? null,
-    };
-
-    const accessToken = signAccessToken(payload);
+    const accessToken = signAccessToken({ userId: user.id, email: user.email });
     const refreshToken = await persistRefreshToken(user.id, deviceInfo);
-    return { accessToken, refreshToken, user: { id: user.id, email: user.email } };
+    const memberships = await getMemberships(user.id);
+
+    return { accessToken, refreshToken, user: { id: user.id, email: user.email }, memberships };
   },
 
   async refresh(rawToken: string, deviceInfo?: string): Promise<{ accessToken: string; refreshToken: string }> {
@@ -121,16 +129,9 @@ export const AuthService = {
       select: { id: true, email: true },
     });
 
-    const membership = await getPrimaryMembership(user.id);
-    const payload: AuthPayload = {
-      userId: user.id,
-      email: user.email,
-      businessId: membership?.businessId ?? null,
-      role: membership?.role ?? null,
-    };
-
-    const accessToken = signAccessToken(payload);
+    const accessToken = signAccessToken({ userId: user.id, email: user.email });
     const refreshToken = await persistRefreshToken(user.id, deviceInfo);
+
     return { accessToken, refreshToken };
   },
 

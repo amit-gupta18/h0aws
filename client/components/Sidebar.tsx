@@ -10,7 +10,7 @@ import {
   BarChart,
 } from 'lucide-react'
 import { sidebarItems } from '@/config/sidebar'
-import { useAuthStore } from '@/store/authStore'
+import { useActiveRole } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -22,7 +22,7 @@ const iconMap: Record<string, React.ReactNode> = {
 }
 
 export default function Sidebar() {
-  const role = useAuthStore((s) => s.role)
+  const role = useActiveRole()
   const pathname = usePathname()
 
   if (!role) return null
