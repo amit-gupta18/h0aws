@@ -452,47 +452,86 @@ invoices/{businessId}/{invoiceId}.pdf
 
 ## 8. Invoice Template Layout
 
+Reference design: standard Indian GST tax invoice format.
+
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│ [LOGO]  BUSINESS NAME                    │ Invoice No:              │
-│         Address Line 1                   │ Invoice Date:            │
-│         City, State — PIN                │ Delivery Note:           │
-│         GSTIN: XXXXXXXX                  │ Mode of Payment:         │
-│         Phone: XXXXXXXXXX                │ Supplier Ref:            │
-│              70%                         │      30%                 │
-├──────────────────────────────────────────┤                          │
-│ BILL TO                                  │ Buyer's Order No:        │
-│ Name:                                    │ Buyer's Order Date:      │
-│ Address:                                 │ Dispatch Doc No:         │
-│ GSTIN:            State:                 │ Dispatched Through:      │
-│        60%                               │      30%                 │
-├──────────────────────────────────────────┴──────────────────────────┤
-│ # │ ITEM NAME           │ HSN  │ QTY  │ UNIT │ RATE    │ AMOUNT    │
-├───┼─────────────────────┼──────┼──────┼──────┼─────────┼───────────┤
-│ 1 │                     │      │      │      │         │           │
-│ 2 │                     │      │      │      │         │           │
-├───┴─────────────────────┴──────┴──────┴──────┼─────────┼───────────┤
-│                                              │Subtotal │           │
-│ TAX SUMMARY                                  ├─────────┼───────────┤
-│ HSN  │ Taxable Val │ CGST        │ SGST       │ CGST    │           │
-│      │             │ Rate│Amount │ Rate│Amount│ SGST    │           │
-├──────┼─────────────┼─────┼───────┼─────┼──────┼─────────┼──────────┤
-│      │             │     │       │     │      │ Tax     │           │
-│      │             │     │       │     │      ├─────────┼──────────┤
-│      │             │     │       │     │      │ GRAND   │           │
-│      │             │     │       │     │      │ TOTAL   │           │
-├──────────────────────────────────────────────┴─────────┴──────────┤
-│ Amount in Words: Indian Rupees _____ Only                          │
-├───────────────────────────────────┬────────────────────────────────┤
-│ BANK DETAILS                      │ Authorised Signatory           │
-│ Bank:                             │                                │
-│ A/C No:                           │                                │
-│ IFSC:                             │            [STAMP / SIGN]      │
-├───────────────────────────────────┴────────────────────────────────┤
-│ Declaration: Goods once sold will not be taken back.               │
-│          This is a Computer Generated Invoice                      │
-└────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                           TAX INVOICE                                  │
+│                                                  ORIGINAL FOR RECIPIENT│
+├─────────────────────────────────────┬──────────────────────────────────┤
+│ M/S BUSINESS NAME (FY 20XX-XX)      │ Invoice No.        │ Dated       │
+│ Address Line 1                      │                    │             │
+│ City - PIN                          ├────────────────────┼─────────────┤
+│ GSTIN/UIN : XXXXXXXXXXXXXXX         │ Delivery Note      │ Mode/Terms  │
+│ State Name : State, Code : XX       ├────────────────────┼─────────────┤
+│                                     │ Reference No.&Date │ Other Refs  │
+├─────────────────────────────────────┼────────────────────┴─────────────┤
+│ BUYER (BILL TO)                     │ Buyer's Order No.  │ Dated       │
+│ M/S BUYER NAME                      ├────────────────────┼─────────────┤
+│ Address Line 1, Address Line 2      │ Dispatch Doc No.   │ Del. Date   │
+│ GSTIN/UIN : XXXXXXXXXXXXXXX         ├────────────────────┼─────────────┤
+│ State Name : State, Code : XX       │ Dispatched Through │ Destination │
+│                                     ├────────────────────┴─────────────┤
+│                                     │ Terms of Delivery                │
+├──────┬──────────────────────┬───────┴──┬──────────┬──────┬──────┬──────┤
+│ Sl   │ Description of Goods │ HSN/SAC  │ Quantity │ Unit │ Rate │Amnt  │
+│ No.  │                      │          │          │      │      │      │
+├──────┼──────────────────────┼──────────┼──────────┼──────┼──────┼──────┤
+│  1   │                      │          │          │      │      │      │
+│  2   │                      │          │          │      │      │      │
+│      │  (blank filler rows) │          │          │      │      │      │
+│      │                      │          │          │      │      │      │
+│      │                      │          │          │      │      │      │
+├──────┴──────────────────────┴──────────┴──────────┴──────┼──────┼──────┤
+│                                                          │Subtl │      │
+│                                                          ├──────┼──────┤
+│                                                          │CGST  │      │
+│                                                          ├──────┼──────┤
+│                                                          │SGST  │      │
+├─────────────────────────────────────────── [Total Qty]  ─┼──────┼──────┤
+│                                             Grand Total  │  ₹XX │      │
+├──────────────────────────────────────────────────────────┴──────┴──────┤
+│ Amount Chargeable (in words): [words]                        E. & O.E  │
+├──────────┬───────────────┬──────────────────┬──────────────────┬───────┤
+│ HSN/SAC  │ Taxable Value │     CGST         │   SGST/UTGST     │ Total │
+│          │               │  Rate  │ Amount  │  Rate  │ Amount  │  Tax  │
+├──────────┼───────────────┼────────┼─────────┼────────┼─────────┼───────┤
+│          │               │        │         │        │         │       │
+├──────────┼───────────────┼────────┼─────────┼────────┼─────────┼───────┤
+│  Total   │               │        │         │        │         │       │
+├──────────────────────────────────────────────────────────────────────  ┤
+│ Tax Amount (in words): [words]                                         │
+├─────────────────────────────────────┬──────────────────────────────────┤
+│ COMPANY'S BANK DETAILS              │ for                              │
+│ A/c Holder's Name : [blank V1]      │ [BUSINESS NAME]                  │
+│ Bank Name         : [blank V1]      │                                  │
+│ A/c No.           : [blank V1]      │                                  │
+│ Branch & IFSC     : [blank V1]      │              Authorised Signatory│
+├─────────────────────────────────────┴──────────────────────────────────┤
+│ Declaration                                                            │
+│ We declare that this invoice shows the actual price of the goods       │
+│ described and that all particulars are true and correct.               │
+├────────────────────────────────────────────────────────────────────────┤
+│                  This is a Computer Generated Invoice                  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Template notes for implementation:**
+- Title: `TAX INVOICE` or `BILL OF SUPPLY` (from `documentType`) — centered, bold, large
+- "ORIGINAL FOR RECIPIENT" — small text, top-right corner
+- Sender logo: if `business.logoUrl` present, render as image (~48px height) immediately before the business name — i.e. the first element inside the left header block, with the name/address/GSTIN flowing below it; skip the image element entirely if null
+- Business name formatted as: `M/S {tradeName}` — all caps
+- Right header grid: 3 rows × 2 cols — Invoice No/Dated, Delivery Note/Mode of Payment (show `paymentMode`), Reference No./Other References (leave blank V1)
+- Buyer grid (right side): 4 rows — Buyer's Order (blank), Dispatch (blank), Dispatched Through/Destination (blank), Terms of Delivery (blank) — structural placeholders
+- Items table: render items + enough blank rows to reach a minimum page height (pad to ~15 rows total)
+- Totals column (right of items): Subtotal | CGST | SGST (or IGST for inter-state) | Grand Total with ₹ symbol
+- Bottom-left of items table: total quantity (sum of all item quantities with unit if uniform)
+- Amount in words: full row spanning table width
+- GST summary table: grouped by HSN/SAC — one row per unique HSN, totals row
+- Tax amount in words: full row spanning table width
+- Bank details: all shown as blank dashes for V1 (schema fields don't exist yet)
+- "for [BUSINESS NAME]" + "Authorised Signatory" on right
+- Declaration text + "This is a Computer Generated Invoice" footer
 
 ---
 
