@@ -38,4 +38,10 @@ export const sidebarItems: SidebarItem[] = [
     icon: 'bar-chart',
     roles: ['OWNER'],
   },
+  {
+    label: 'Team',
+    href: '/dashboard/team',
+    icon: 'user-plus',
+    roles: ['OWNER'],
+  },
 ]

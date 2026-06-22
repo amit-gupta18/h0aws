@@ -1,4 +1,5 @@
-import React from "react";
+"use client";
+
 import {
   Document,
   Page,
@@ -7,7 +8,8 @@ import {
   StyleSheet,
   Image,
 } from "@react-pdf/renderer";
-import { amountToWords } from "../lib/amount-to-words.js";
+import { amountToWords } from "@/lib/amount-to-words";
+import type { InvoiceTemplateData, InvoiceTemplateItem } from "./types";
 
 const BORDER = "1pt solid #111";
 const THIN = "0.5pt solid #bbb";
@@ -18,7 +20,6 @@ const s = StyleSheet.create({
   page: { fontFamily: "Helvetica", fontSize: 8, padding: 20, color: "#111" },
   wrap: { border: BORDER },
 
-  // Title
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -32,7 +33,6 @@ const s = StyleSheet.create({
   titleText: { flex: 1, fontSize: 14, fontFamily: BOLD, textAlign: "center" },
   originalTag: { width: 90, fontSize: 7, textAlign: "right" },
 
-  // Seller + meta
   topRow: { flexDirection: "row", borderBottom: BORDER },
   sellerBlock: { width: "55%", borderRight: BORDER, padding: 6 },
   logo: { height: 40, marginBottom: 4 },
@@ -48,14 +48,12 @@ const s = StyleSheet.create({
   mlabel: { fontSize: 6.5, color: "#666", marginBottom: 1 },
   mvalue: { fontSize: 8, fontFamily: BOLD },
 
-  // Buyer + dispatch
   buyerRow: { flexDirection: "row", borderBottom: BORDER },
   buyerBlock: { width: "55%", borderRight: BORDER, padding: 6 },
   buyerSectionLabel: { fontSize: 7, color: "#666", marginBottom: 2 },
   buyerName: { fontFamily: BOLD, fontSize: 9, marginBottom: 2 },
   dispatchBlock: { width: "45%", flexDirection: "column" },
 
-  // Items table
   thr: { flexDirection: "row", borderBottom: BORDER, backgroundColor: "#f0f0f0" },
   tr: { flexDirection: "row", borderBottom: THIN, minHeight: 18 },
   tblank: { flexDirection: "row", borderBottom: THIN, height: 18 },
@@ -69,7 +67,6 @@ const s = StyleSheet.create({
   cAmt: { width: "20%", padding: 3, textAlign: "right" },
   bold: { fontFamily: BOLD },
 
-  // Totals within items
   tFooter: { flexDirection: "row", borderTop: BORDER },
   tFootLeft: { width: "60%", borderRight: BORDER, padding: 4 },
   tFootRight: { width: "40%", flexDirection: "column" },
@@ -84,7 +81,6 @@ const s = StyleSheet.create({
   },
   gtText: { fontFamily: BOLD, fontSize: 9 },
 
-  // Amount in words
   amtWords: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -92,7 +88,6 @@ const s = StyleSheet.create({
     padding: 5,
   },
 
-  // GST summary table
   gh1: { flexDirection: "row", backgroundColor: "#f0f0f0" },
   gh2: { flexDirection: "row", borderBottom: BORDER, backgroundColor: "#f0f0f0" },
   gdr: { flexDirection: "row", borderBottom: THIN },
@@ -110,10 +105,8 @@ const s = StyleSheet.create({
   gIgstRate: { width: "21%", padding: 3, borderRight: THIN, textAlign: "right" },
   gIgstAmt: { width: "21%", padding: 3, borderRight: THIN, textAlign: "right" },
 
-  // Tax in words
   taxWords: { borderBottom: BORDER, padding: 5 },
 
-  // Bank + signatory
   bsRow: { flexDirection: "row", borderBottom: BORDER },
   bankCol: { width: "50%", borderRight: BORDER, padding: 6 },
   bankTitle: { fontFamily: BOLD, marginBottom: 4 },
@@ -125,59 +118,11 @@ const s = StyleSheet.create({
   sigBiz: { fontFamily: BOLD, fontSize: 8, marginBottom: 28 },
   sigLine: { textAlign: "right", fontSize: 7 },
 
-  // Declaration + footer
   declRow: { borderBottom: BORDER, padding: 5 },
   declBold: { fontFamily: BOLD, fontSize: 7, marginBottom: 1 },
   declText: { fontSize: 7, color: "#444" },
   footer: { padding: 4, textAlign: "center", fontFamily: BOLD, fontSize: 7 },
 });
-
-export type InvoiceTemplateItem = {
-  nameSnapshot: string;
-  hsnSnapshot?: string | null;
-  unitSnapshot?: string | null;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  gstRate: number;
-  taxableValue: number;
-  cgstAmount: number;
-  sgstAmount: number;
-  igstAmount: number;
-  lineTotal: number;
-};
-
-export type InvoiceTemplateData = {
-  invoiceNumber: string;
-  invoiceDate: string;
-  documentType: string;
-  transactionType: string;
-  paymentMode: string;
-  notes?: string | null;
-  business: {
-    tradeName: string;
-    legalName?: string | null;
-    gstin?: string | null;
-    address?: string | null;
-    stateCode: string;
-    phone?: string | null;
-    logoUrl?: string | null;
-  };
-  customer: {
-    name: string;
-    gstin?: string | null;
-    billingAddress?: string | null;
-    stateCode?: string | null;
-  } | null;
-  items: InvoiceTemplateItem[];
-  subtotal: number;
-  discount: number;
-  taxableAmount: number;
-  cgstTotal: number;
-  sgstTotal: number;
-  igstTotal: number;
-  grandTotal: number;
-};
 
 type HsnRow = {
   hsn: string;
@@ -216,7 +161,7 @@ function groupByHsn(items: InvoiceTemplateItem[]): HsnRow[] {
   return Array.from(map.values());
 }
 
-export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
+export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
   const isInterState = data.transactionType === "INTER_STATE";
   const isBillOfSupply = data.documentType === "BILL_OF_SUPPLY";
   const hsnSummary = groupByHsn(data.items);
@@ -229,7 +174,6 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
       <Page size="A4" style={s.page}>
         <View style={s.wrap}>
 
-          {/* ── Title ─────────────────────────────────────────────── */}
           <View style={s.titleRow}>
             <View style={s.titleSpacer} />
             <Text style={s.titleText}>
@@ -238,7 +182,6 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             <Text style={s.originalTag}>ORIGINAL FOR RECIPIENT</Text>
           </View>
 
-          {/* ── Seller + Invoice meta ──────────────────────────────── */}
           <View style={s.topRow}>
             <View style={s.sellerBlock}>
               {data.business.logoUrl != null && (
@@ -256,9 +199,7 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
               {data.business.phone != null && (
                 <Text style={s.line}>Phone : {data.business.phone}</Text>
               )}
-              <Text style={s.line}>
-                State Name : {data.business.stateCode}
-              </Text>
+              <Text style={s.line}>State Name : {data.business.stateCode}</Text>
             </View>
 
             <View style={s.metaBlock}>
@@ -295,7 +236,6 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             </View>
           </View>
 
-          {/* ── Buyer + Dispatch meta ─────────────────────────────── */}
           <View style={s.buyerRow}>
             <View style={s.buyerBlock}>
               <Text style={s.buyerSectionLabel}>BUYER (BILL TO)</Text>
@@ -311,9 +251,7 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
                     <Text style={s.line}>GSTIN/UIN : {data.customer.gstin}</Text>
                   )}
                   {data.customer.stateCode != null && (
-                    <Text style={s.line}>
-                      State Name : {data.customer.stateCode}
-                    </Text>
+                    <Text style={s.line}>State Name : {data.customer.stateCode}</Text>
                   )}
                 </>
               ) : (
@@ -324,7 +262,7 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             <View style={s.dispatchBlock}>
               <View style={s.metaRow}>
                 <View style={s.mc}>
-                  <Text style={s.mlabel}>{"Buyer’s Order No."}</Text>
+                  <Text style={s.mlabel}>{"Buyer's Order No."}</Text>
                   <Text style={s.mvalue}> </Text>
                 </View>
                 <View style={s.mcR}>
@@ -361,7 +299,7 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             </View>
           </View>
 
-          {/* ── Items table ───────────────────────────────────────── */}
+          {/* Items table */}
           <View style={s.thr}>
             <Text style={[s.cSl, s.bold]}>{"Sl\nNo."}</Text>
             <Text style={[s.cDesc, s.bold]}>Description of Goods</Text>
@@ -396,7 +334,6 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             </View>
           ))}
 
-          {/* Subtotal / CGST / SGST */}
           <View style={s.tFooter}>
             <View style={s.tFootLeft}>
               <Text style={[s.bold, { fontSize: 8 }]}>{totalQty}</Text>
@@ -426,13 +363,11 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             </View>
           </View>
 
-          {/* Grand Total */}
           <View style={s.gtRow}>
             <Text style={s.gtText}>Grand Total</Text>
             <Text style={s.gtText}>&#8377; {data.grandTotal.toFixed(2)}</Text>
           </View>
 
-          {/* ── Amount in words ───────────────────────────────────── */}
           <View style={s.amtWords}>
             <Text>
               <Text style={s.bold}>Amount Chargeable (in words) : </Text>
@@ -441,7 +376,7 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             <Text>E. &amp; O.E</Text>
           </View>
 
-          {/* ── GST Summary Table ─────────────────────────────────── */}
+          {/* GST Summary */}
           <View style={s.gh1}>
             <Text style={[s.gHsn, s.bold]}>HSN/SAC</Text>
             <Text style={[s.gTax, s.bold, { textAlign: "center" }]}>
@@ -525,7 +460,6 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             )}
           </View>
 
-          {/* ── Tax Amount in words ───────────────────────────────── */}
           <View style={s.taxWords}>
             <Text>
               <Text style={s.bold}>Tax Amount (in words) : </Text>
@@ -533,12 +467,11 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             </Text>
           </View>
 
-          {/* ── Bank Details + Signatory ──────────────────────────── */}
           <View style={s.bsRow}>
             <View style={s.bankCol}>
-              <Text style={s.bankTitle}>{"COMPANY’S BANK DETAILS"}</Text>
+              <Text style={s.bankTitle}>{"COMPANY'S BANK DETAILS"}</Text>
               <View style={s.bankR}>
-                <Text style={s.bankK}>{"A/c Holder’s Name"}</Text>
+                <Text style={s.bankK}>{"A/c Holder's Name"}</Text>
                 <Text style={s.bankV}> : </Text>
               </View>
               <View style={s.bankR}>
@@ -561,7 +494,6 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             </View>
           </View>
 
-          {/* ── Declaration ───────────────────────────────────────── */}
           <View style={s.declRow}>
             <Text style={s.declBold}>Declaration</Text>
             <Text style={s.declText}>
@@ -570,7 +502,6 @@ export function InvoiceTemplate({ data }: { data: InvoiceTemplateData }) {
             </Text>
           </View>
 
-          {/* ── Footer ────────────────────────────────────────────── */}
           <View style={s.footer}>
             <Text>This is a Computer Generated Invoice</Text>
           </View>

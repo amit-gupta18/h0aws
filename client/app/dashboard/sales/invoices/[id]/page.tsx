@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { useInvoice, useCancelInvoice, useInvoicePdf } from '@/hooks/useInvoices'
 import { useActiveRole } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
-import { InvoiceTemplate, type InvoiceTemplateData } from '@/components/InvoiceTemplate'
+import { getTemplate, type InvoiceTemplateData } from '@/components/templates'
 import { ArrowLeft, Download, XCircle } from 'lucide-react'
 
 const PDFViewer = dynamic(
@@ -86,6 +86,8 @@ export default function InvoiceDetailPage() {
     igstTotal: invoice.igstTotal,
     grandTotal: invoice.grandTotal,
   }
+
+  const Template = getTemplate(invoice.templateId)
 
   return (
     <div className="space-y-6">
@@ -294,7 +296,7 @@ export default function InvoiceDetailPage() {
             <h2 className="mb-3 font-medium">Preview</h2>
             <div className="h-[800px] overflow-hidden rounded-lg border">
               <PDFViewer width="100%" height="100%" showToolbar={false}>
-                <InvoiceTemplate data={templateData} />
+                <Template data={templateData} />
               </PDFViewer>
             </div>
           </div>

@@ -22,6 +22,8 @@ export const CreateInvoiceSchema = z.object({
   customerId: z.string().uuid().optional(),
   invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentMode: z.enum(["CASH", "UPI", "CARD", "CREDIT"]).default("CASH"),
+  // Optional per-invoice override; falls back to the business default template.
+  templateId: z.enum(["CLASSIC", "MODERN", "COMPACT"]).optional(),
   notes: z.string().optional(),
   items: z.array(SaleItemSchema).min(1),
 });

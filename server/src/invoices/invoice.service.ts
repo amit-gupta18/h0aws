@@ -3,7 +3,7 @@ import { calculateGST } from "../lib/gst-engine.js";
 import { uploadPdf, deletePdf, pdfExists, getPresignedUrl } from "../lib/r2.js";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
-import { InvoiceTemplate, type InvoiceTemplateData } from "./invoice-template.js";
+import { getTemplate, type InvoiceTemplateData } from "./templates/index.js";
 import type { CreateInvoiceInput, ListInvoicesQuery } from "./invoice.schema.js";
 import type { Prisma } from "@prisma/client";
 
@@ -31,8 +31,11 @@ export const InvoiceService = {
         stateCode: true,
         phone: true,
         logoUrl: true,
+        defaultTemplate: true,
       },
     });
+
+    const templateId = input.templateId ?? business.defaultTemplate;
 
     let customer: {
       id: string;
@@ -93,6 +96,7 @@ export const InvoiceService = {
           paymentMode: input.paymentMode,
           notes: input.notes ?? null,
           status: "ISSUED",
+          templateId,
         },
       });
 
@@ -173,7 +177,9 @@ export const InvoiceService = {
       };
 
       const pdfBuffer = await renderToBuffer(
-        React.createElement(InvoiceTemplate, { data: templateData }) as any
+        React.createElement(getTemplate(invoiceWithItems.templateId), {
+          data: templateData,
+        }) as any
       );
 
       const r2Key = getR2Key(businessId, invoice.id);
@@ -315,6 +321,7 @@ export const InvoiceService = {
       paymentMode: invoice.paymentMode,
       notes: invoice.notes,
       status: invoice.status,
+      templateId: invoice.templateId,
       pdfUrl: invoice.pdfUrl,
       createdAt: invoice.createdAt.toISOString(),
     };
@@ -368,7 +375,9 @@ export const InvoiceService = {
     };
 
     const pdfBuffer = await renderToBuffer(
-      React.createElement(InvoiceTemplate, { data: templateData }) as any
+      React.createElement(getTemplate(invoice.templateId), {
+        data: templateData,
+      }) as any
     );
 
     await uploadPdf(r2Key, Buffer.from(pdfBuffer));
