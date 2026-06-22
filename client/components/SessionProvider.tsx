@@ -34,7 +34,9 @@ export default function SessionProvider({ children }: { children: React.ReactNod
         })
       })
       .catch(() => {
-        clearAuth()
+        if (!useAuthStore.getState().accessToken) {
+          clearAuth()
+        }
       })
   }, [])
 
