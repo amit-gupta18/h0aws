@@ -220,6 +220,8 @@ model Invoice {
   sgstTotal       Decimal         @db.Decimal(12, 2) @default(0)
   igstTotal       Decimal         @db.Decimal(12, 2) @default(0)
   grandTotal      Decimal         @db.Decimal(12, 2)
+  paymentMode     PaymentMode     @default(CASH)
+  notes           String?
   status          InvoiceStatus   @default(ISSUED)
   pdfUrl          String?
   createdAt       DateTime        @default(now())
