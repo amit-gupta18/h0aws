@@ -25,11 +25,6 @@ export const BusinessService = {
         data: { userId, businessId: business.id, role: "OWNER" },
       });
 
-      // Default stock location — no UI in V1, but inventory needs a home.
-      await tx.location.create({
-        data: { businessId: business.id, name: "Main Shop" },
-      });
-
       // Atomic invoice counter; prefix lives here (single source of truth).
       await tx.invoiceSequence.create({
         data: { businessId: business.id, prefix: input.invoicePrefix, currentVal: 0 },
