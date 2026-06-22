@@ -10,7 +10,7 @@ export type SidebarItem = {
 export const sidebarItems: SidebarItem[] = [
   {
     label: 'Sales',
-    href: '/dashboard/sales',
+    href: '/dashboard/sales/invoices',
     icon: 'receipt',
     roles: ['OWNER', 'ACCOUNTANT'],
   },

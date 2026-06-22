@@ -4,4 +4,6 @@ export type Membership = {
   businessId: string
   tradeName: string
   role: Role
+  gstin?: string | null
+  stateCode: string
 }

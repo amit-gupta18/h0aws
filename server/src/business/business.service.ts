@@ -50,9 +50,19 @@ export const BusinessService = {
   async listForUser(userId: string) {
     const rows = await prisma.businessMember.findMany({
       where: { userId },
-      select: { businessId: true, role: true, business: { select: { tradeName: true } } },
+      select: {
+        businessId: true,
+        role: true,
+        business: { select: { tradeName: true, gstin: true, stateCode: true } },
+      },
       orderBy: { createdAt: "asc" },
     });
-    return rows.map((r) => ({ businessId: r.businessId, tradeName: r.business.tradeName, role: r.role }));
+    return rows.map((r) => ({
+      businessId: r.businessId,
+      tradeName: r.business.tradeName,
+      role: r.role,
+      gstin: r.business.gstin,
+      stateCode: r.business.stateCode,
+    }));
   },
 };
