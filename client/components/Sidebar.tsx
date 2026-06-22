@@ -27,7 +27,7 @@ const iconMap: Record<string, React.ReactNode> = {
   'user-plus': <UserPlus size={18} />,
 }
 
-export default function Sidebar() {
+export default function Sidebar({ className }: { className?: string }) {
   const role = useActiveRole()
   const pathname = usePathname()
   const router = useRouter()
@@ -53,7 +53,7 @@ export default function Sidebar() {
   }
 
   return (
-    <nav className="flex flex-col w-56 shrink-0 border-r border-border h-full">
+    <nav className={cn("hidden md:flex flex-col w-56 shrink-0 border-r border-border h-full bg-sidebar", className)}>
       {memberships.length > 1 && (
         <div className="px-3 pt-4 pb-2 border-b border-border space-y-1">
           <p className="text-xs text-muted-foreground px-2 mb-1 flex items-center gap-1">

@@ -5,7 +5,7 @@ import ky from 'ky'
 import { useAuthStore } from '@/store/authStore'
 import type { Membership } from '@/shared/types'
 
-const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3000/api/v1'
+const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
 
 interface RefreshResponse {
   accessToken: string
