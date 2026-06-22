@@ -13,6 +13,8 @@ export const CreateProductSchema = z.object({
   unit: z.string().min(1),
   hsnCode: z.string().optional(),
   category: z.string().optional(),
+  quantity: z.number().nonnegative().default(0), // collective stock on hand
+  location: z.string().optional(), // free-text label, e.g. "Shelf A / Warehouse"
 });
 
 export type CreateProductInput = z.infer<typeof CreateProductSchema>;

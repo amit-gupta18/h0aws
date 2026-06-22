@@ -27,6 +27,8 @@ export const ProductService = {
         unit: true,
         sellingPrice: true,
         gstRate: true,
+        quantity: true,
+        location: true,
       },
     });
   },
@@ -41,6 +43,8 @@ export const ProductService = {
         unit: input.unit,
         hsnCode: input.hsnCode ?? null,
         category: input.category ?? null,
+        quantity: input.quantity,
+        location: input.location ?? null,
       },
       select: {
         id: true,
@@ -49,6 +53,8 @@ export const ProductService = {
         unit: true,
         sellingPrice: true,
         gstRate: true,
+        quantity: true,
+        location: true,
       },
     });
   },

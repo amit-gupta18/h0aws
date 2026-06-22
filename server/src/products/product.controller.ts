@@ -15,6 +15,7 @@ export const ProductController = {
           ...p,
           sellingPrice: Number(p.sellingPrice),
           gstRate: Number(p.gstRate),
+          quantity: Number(p.quantity),
         })),
       });
     } catch (err) {
@@ -37,6 +38,7 @@ export const ProductController = {
         ...product,
         sellingPrice: Number(product.sellingPrice),
         gstRate: Number(product.gstRate),
+        quantity: Number(product.quantity),
       });
     } catch (err) {
       handleError(err, res);

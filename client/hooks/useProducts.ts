@@ -12,6 +12,8 @@ type Product = {
   unit: string
   sellingPrice: number
   gstRate: number
+  quantity: number
+  location: string | null
 }
 
 type CreateProductInput = {
@@ -21,6 +23,8 @@ type CreateProductInput = {
   unit: string
   hsnCode?: string
   category?: string
+  quantity?: number
+  location?: string
 }
 
 async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
