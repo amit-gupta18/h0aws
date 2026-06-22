@@ -29,7 +29,14 @@ export const api = ky.create({
 
             useAuthStore.getState().setAccessToken(data.accessToken)
 
-            return ky(request)
+            const retryHeaders = new Headers(request.headers)
+            retryHeaders.set('Authorization', `Bearer ${data.accessToken}`)
+            return fetch(new Request(request.url, {
+              method: request.method,
+              headers: retryHeaders,
+              body: request.bodyUsed ? null : request.body,
+              credentials: request.credentials,
+            }))
           } catch {
             useAuthStore.getState().clearAuth()
             window.location.href = '/login'

@@ -32,7 +32,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       email,
       accessToken,
       memberships,
-      activeBusinessId: memberships.length === 1 ? memberships[0].businessId : null,
+      activeBusinessId: memberships.length > 0 ? memberships[0].businessId : null,
     }),
 
   setAccessToken: (accessToken) => set({ accessToken }),
