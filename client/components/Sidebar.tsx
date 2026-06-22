@@ -8,6 +8,7 @@ import {
   Box,
   Wallet,
   BarChart,
+  UserPlus,
   LogOut,
   Building2,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ const iconMap: Record<string, React.ReactNode> = {
   box: <Box size={18} />,
   wallet: <Wallet size={18} />,
   'bar-chart': <BarChart size={18} />,
+  'user-plus': <UserPlus size={18} />,
 }
 
 export default function Sidebar() {

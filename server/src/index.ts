@@ -7,6 +7,7 @@ import { businessRouter } from "./business/business.route.js";
 import { invoicesRouter } from "./invoices/invoice.route.js";
 import { customersRouter } from "./customers/customer.route.js";
 import { productsRouter } from "./products/product.route.js";
+import { membersRouter } from "./members/member.route.js";
 
 const app = express();
 const PORT = process.env["PORT"] ?? 3001;
@@ -20,6 +21,7 @@ app.use("/api/v1/businesses", businessRouter);
 app.use("/api/v1/invoices", invoicesRouter);
 app.use("/api/v1/customers", customersRouter);
 app.use("/api/v1/products", productsRouter);
+app.use("/api/v1/members", membersRouter);
 
 app.get("/health", async (_req, res) => {
   try {

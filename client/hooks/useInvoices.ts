@@ -5,6 +5,8 @@ import { HTTPError } from 'ky'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 
+type InvoiceTemplateId = 'CLASSIC' | 'MODERN' | 'COMPACT'
+
 type InvoiceListItem = {
   id: string
   invoiceNumber: string
@@ -72,6 +74,7 @@ type InvoiceDetail = {
   paymentMode: string
   notes: string | null
   status: string
+  templateId: InvoiceTemplateId
   pdfUrl: string | null
   createdAt: string
 }
@@ -81,6 +84,7 @@ type CreateInvoiceInput = {
   customerId?: string
   invoiceDate: string
   paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT'
+  templateId?: InvoiceTemplateId
   notes?: string
   items: {
     productId?: string
@@ -186,4 +190,10 @@ export function useInvoicePdf(id: string, enabled = false) {
   })
 }
 
-export type { InvoiceListItem, InvoiceDetail, CreateInvoiceInput, InvoiceFilters }
+export type {
+  InvoiceListItem,
+  InvoiceDetail,
+  CreateInvoiceInput,
+  InvoiceFilters,
+  InvoiceTemplateId,
+}

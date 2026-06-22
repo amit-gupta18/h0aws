@@ -49,6 +49,12 @@ enum PaymentMode {
   CREDIT
 }
 
+enum InvoiceTemplate {
+  CLASSIC // Standard GST tax-invoice format (only design implemented in V1)
+  MODERN // Clean, minimal design — design pending
+  COMPACT // Thermal printer / POS friendly — design pending
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -78,6 +84,7 @@ model Business {
   stateCode     String
   phone         String?
   logoUrl       String?
+  defaultTemplate InvoiceTemplate @default(CLASSIC)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -223,6 +230,7 @@ model Invoice {
   paymentMode     PaymentMode     @default(CASH)
   notes           String?
   status          InvoiceStatus   @default(ISSUED)
+  templateId      InvoiceTemplate @default(CLASSIC)
   pdfUrl          String?
   createdAt       DateTime        @default(now())
 
