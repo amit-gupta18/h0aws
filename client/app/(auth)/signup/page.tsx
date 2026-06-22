@@ -2,12 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useSignup } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 
 export default function SignupPage() {
-  const router = useRouter()
   const signup = useSignup()
 
   const [email, setEmail] = useState('')
@@ -16,10 +14,14 @@ export default function SignupPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const body: { email: string; password: string; phone?: string } = { email, password }
-    if (phone) body.phone = phone
-    await signup.mutateAsync(body)
-    router.push('/onboarding')
+    try {
+      const body: { email: string; password: string; phone?: string } = { email, password }
+      if (phone) body.phone = phone
+      await signup.mutateAsync(body)
+      window.location.href = '/onboarding'
+    } catch {
+      // error is surfaced via signup.error
+    }
   }
 
   return (

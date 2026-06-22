@@ -2,12 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useLogin } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 
 export default function LoginPage() {
-  const router = useRouter()
   const login = useLogin()
 
   const [email, setEmail] = useState('')
@@ -15,8 +13,12 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const data = await login.mutateAsync({ email, password })
-    router.push(data.memberships.length > 0 ? '/dashboard' : '/onboarding')
+    try {
+      const data = await login.mutateAsync({ email, password })
+      window.location.href = data.memberships.length > 0 ? '/dashboard' : '/onboarding'
+    } catch {
+      // error is surfaced via login.error
+    }
   }
 
   return (
