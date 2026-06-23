@@ -34,7 +34,11 @@ export const BusinessController = {
   // GET /api/v1/businesses/:id — get full business details
   async getById(req: Request, res: Response): Promise<void> {
     const userId = req.user!.userId;
-    const businessId = req.params.id;
+    const businessId = req.params["id"];
+    if (!businessId || Array.isArray(businessId)) {
+      res.status(400).json({ error: "Business ID is required" });
+      return;
+    }
     try {
       const business = await BusinessService.getById(businessId, userId);
       res.json(business);
@@ -46,7 +50,11 @@ export const BusinessController = {
   // PUT /api/v1/businesses/:id — update business details (OWNER only)
   async update(req: Request, res: Response): Promise<void> {
     const userId = req.user!.userId;
-    const businessId = req.params.id;
+    const businessId = req.params["id"];
+    if (!businessId || Array.isArray(businessId)) {
+      res.status(400).json({ error: "Business ID is required" });
+      return;
+    }
     const parsed = UpdateBusinessSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.flatten() });

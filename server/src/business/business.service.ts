@@ -116,7 +116,15 @@ export const BusinessService = {
       throw err;
     }
 
-    const { invoicePrefix, ...businessData } = input;
+    const { invoicePrefix, ...rest } = input;
+
+    // Filter out undefined values to satisfy Prisma's exactOptionalPropertyTypes
+    const businessData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(rest)) {
+      if (value !== undefined) {
+        businessData[key] = value;
+      }
+    }
 
     const business = await prisma.business.update({
       where: { id: businessId },
