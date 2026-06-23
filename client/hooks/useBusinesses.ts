@@ -1,10 +1,10 @@
 'use client'
 
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HTTPError } from 'ky'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
-import type { Membership } from '@/shared/types'
+import type { Membership, Role } from '@/shared/types'
 
 type CreateBusinessResponse = {
   business: { id: string; tradeName: string }
@@ -19,6 +19,32 @@ type CreateBusinessInput = {
   gstin?: string
   address?: string
   phone?: string
+}
+
+type BusinessDetail = {
+  id: string
+  tradeName: string
+  legalName: string | null
+  gstin: string | null
+  gstinType: 'REGULAR' | 'COMPOSITION' | 'UNREGISTERED'
+  address: string | null
+  stateCode: string
+  phone: string | null
+  logoUrl: string | null
+  invoicePrefix: string
+  role: Role
+  createdAt: string
+}
+
+type UpdateBusinessInput = {
+  tradeName?: string
+  legalName?: string | null
+  gstin?: string | null
+  gstinType?: 'REGULAR' | 'COMPOSITION' | 'UNREGISTERED'
+  address?: string | null
+  stateCode?: string
+  phone?: string | null
+  invoicePrefix?: string
 }
 
 async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
@@ -43,6 +69,16 @@ export function useBusinesses() {
   })
 }
 
+export function useBusiness(businessId: string | null) {
+  const accessToken = useAuthStore((s) => s.accessToken)
+  return useQuery({
+    queryKey: ['business', businessId],
+    queryFn: () =>
+      apiCall(() => api.get(`businesses/${businessId}`).json<BusinessDetail>()),
+    enabled: !!accessToken && !!businessId,
+  })
+}
+
 export function useCreateBusiness() {
   const addMembership = useAuthStore((s) => s.addMembership)
   return useMutation({
@@ -53,3 +89,20 @@ export function useCreateBusiness() {
     onSuccess: ({ membership }) => addMembership(membership),
   })
 }
+
+export function useUpdateBusiness() {
+  const queryClient = useQueryClient()
+  const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateBusinessInput }) =>
+      apiCall(() =>
+        api.put(`businesses/${id}`, { json: data }).json<BusinessDetail>()
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business', activeBusinessId] })
+      queryClient.invalidateQueries({ queryKey: ['businesses'] })
+    },
+  })
+}
+
+export type { BusinessDetail, UpdateBusinessInput }
