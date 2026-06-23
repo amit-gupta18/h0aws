@@ -9,5 +9,7 @@ router.use(authenticate);
 
 router.post("/", BusinessController.create);
 router.get("/", BusinessController.list);
+router.get("/:id", BusinessController.getById);
+router.put("/:id", BusinessController.update);
 
 export { router as businessRouter };

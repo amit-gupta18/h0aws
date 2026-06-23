@@ -25,6 +25,8 @@ export interface Membership {
   businessId: string;
   tradeName: string;
   role: MemberRole;
+  gstin: string | null;
+  stateCode: string;
 }
 
 export interface AuthResult {
@@ -56,11 +58,17 @@ async function getMemberships(userId: string): Promise<Membership[]> {
     select: {
       businessId: true,
       role: true,
-      business: { select: { tradeName: true } },
+      business: { select: { tradeName: true, gstin: true, stateCode: true } },
     },
     orderBy: { createdAt: "asc" },
   });
-  return rows.map((r) => ({ businessId: r.businessId, tradeName: r.business.tradeName, role: r.role }));
+  return rows.map((r) => ({
+    businessId: r.businessId,
+    tradeName: r.business.tradeName,
+    role: r.role,
+    gstin: r.business.gstin,
+    stateCode: r.business.stateCode,
+  }));
 }
 
 async function persistRefreshToken(userId: string, deviceInfo?: string): Promise<string> {
