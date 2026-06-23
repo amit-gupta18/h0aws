@@ -7,7 +7,7 @@ import { useInvoices } from '@/hooks/useInvoices'
 import { useAuthStore } from '@/store/authStore'
 import { useBusinesses } from '@/hooks/useBusinesses'
 import { useCustomerSearch } from '@/hooks/useCustomers'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -57,12 +57,13 @@ export default function DashboardHome() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Here&apos;s what&apos;s happening today.</p>
         </div>
-        <Button asChild size="lg" className="shrink-0 whitespace-nowrap">
-          <Link href="/dashboard/sales/invoices/new" className="flex items-center gap-1.5">
-            <Plus size={18} />
-            <span>New Invoice</span>
-          </Link>
-        </Button>
+        <Link
+          href="/dashboard/sales/invoices/new"
+          className={buttonVariants({ size: 'lg', className: 'shrink-0 whitespace-nowrap gap-1.5' })}
+        >
+          <Plus size={18} />
+          <span>New Invoice</span>
+        </Link>
       </div>
 
       {/* Stat cards */}
