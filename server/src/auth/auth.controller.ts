@@ -10,10 +10,17 @@ import {
 
 import { handleError } from "../common/errors.js";
 
-const COOKIE_OPTS = {
+const isProduction = process.env["NODE_ENV"] === "production";
+
+const COOKIE_OPTS: {
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: "lax" | "none" | "strict";
+  maxAge: number;
+} = {
   httpOnly: true,
-  secure: process.env["NODE_ENV"] === "production",
-  sameSite: "lax" as const,
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
