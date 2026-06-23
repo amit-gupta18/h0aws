@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { BusinessService } from "./business.service.js";
-import { CreateBusinessSchema } from "./business.schema.js";
+import { CreateBusinessSchema, UpdateBusinessSchema } from "./business.schema.js";
 import { handleError } from "../common/errors.js";
 
 export const BusinessController = {
@@ -26,6 +26,43 @@ export const BusinessController = {
     try {
       const memberships = await BusinessService.listForUser(userId);
       res.json({ memberships });
+    } catch (err) {
+      handleError(err, res);
+    }
+  },
+
+  // GET /api/v1/businesses/:id — get full business details
+  async getById(req: Request, res: Response): Promise<void> {
+    const userId = req.user!.userId;
+    const businessId = req.params["id"];
+    if (!businessId || Array.isArray(businessId)) {
+      res.status(400).json({ error: "Business ID is required" });
+      return;
+    }
+    try {
+      const business = await BusinessService.getById(businessId, userId);
+      res.json(business);
+    } catch (err) {
+      handleError(err, res);
+    }
+  },
+
+  // PUT /api/v1/businesses/:id — update business details (OWNER only)
+  async update(req: Request, res: Response): Promise<void> {
+    const userId = req.user!.userId;
+    const businessId = req.params["id"];
+    if (!businessId || Array.isArray(businessId)) {
+      res.status(400).json({ error: "Business ID is required" });
+      return;
+    }
+    const parsed = UpdateBusinessSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+    try {
+      const business = await BusinessService.update(businessId, userId, parsed.data);
+      res.json(business);
     } catch (err) {
       handleError(err, res);
     }

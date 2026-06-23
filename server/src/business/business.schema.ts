@@ -11,4 +11,16 @@ export const CreateBusinessSchema = z.object({
   invoicePrefix: z.string().min(1).max(10), // e.g. "INV"
 });
 
+export const UpdateBusinessSchema = z.object({
+  tradeName: z.string().min(1).max(120).optional(),
+  legalName: z.string().max(120).nullable().optional(),
+  gstin: z.string().length(15).nullable().optional(),
+  gstinType: z.enum(["REGULAR", "COMPOSITION", "UNREGISTERED"]).optional(),
+  address: z.string().max(300).nullable().optional(),
+  stateCode: z.string().length(2).optional(),
+  phone: z.string().regex(/^[6-9]\d{9}$/).nullable().optional(),
+  invoicePrefix: z.string().min(1).max(10).optional(),
+});
+
 export type CreateBusinessInput = z.infer<typeof CreateBusinessSchema>;
+export type UpdateBusinessInput = z.infer<typeof UpdateBusinessSchema>;

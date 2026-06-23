@@ -240,7 +240,7 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
             <View style={s.buyerBlock}>
               <Text style={s.buyerSectionLabel}>BUYER (BILL TO)</Text>
               {data.customer != null ? (
-                <>
+                <View>
                   <Text style={s.buyerName}>
                     M/S {data.customer.name.toUpperCase()}
                   </Text>
@@ -253,7 +253,7 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
                   {data.customer.stateCode != null && (
                     <Text style={s.line}>State Name : {data.customer.stateCode}</Text>
                   )}
-                </>
+                </View>
               ) : (
                 <Text style={s.buyerName}>Walk-in Customer</Text>
               )}
@@ -323,20 +323,20 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
           ))}
 
           {Array.from({ length: fillerCount }).map((_, i) => (
-            <View key={i} style={s.tblank}>
-              <Text style={s.cSl}> </Text>
-              <Text style={s.cDesc}> </Text>
-              <Text style={s.cHsn}> </Text>
-              <Text style={s.cQty}> </Text>
-              <Text style={s.cUnit}> </Text>
-              <Text style={s.cRate}> </Text>
-              <Text style={s.cAmt}> </Text>
+            <View key={`filler-${i}`} style={s.tblank}>
+              <Text style={s.cSl}>{" "}</Text>
+              <Text style={s.cDesc}>{" "}</Text>
+              <Text style={s.cHsn}>{" "}</Text>
+              <Text style={s.cQty}>{" "}</Text>
+              <Text style={s.cUnit}>{" "}</Text>
+              <Text style={s.cRate}>{" "}</Text>
+              <Text style={s.cAmt}>{" "}</Text>
             </View>
           ))}
 
           <View style={s.tFooter}>
             <View style={s.tFootLeft}>
-              <Text style={[s.bold, { fontSize: 8 }]}>{totalQty}</Text>
+              <Text style={[s.bold, { fontSize: 8 }]}>Total Qty: {totalQty}</Text>
             </View>
             <View style={s.tFootRight}>
               <View style={s.totLine}>
@@ -349,7 +349,7 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
                   <Text>{data.igstTotal.toFixed(2)}</Text>
                 </View>
               ) : (
-                <>
+                <View>
                   <View style={s.totLine}>
                     <Text>CGST</Text>
                     <Text>{data.cgstTotal.toFixed(2)}</Text>
@@ -358,14 +358,14 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
                     <Text>SGST</Text>
                     <Text>{data.sgstTotal.toFixed(2)}</Text>
                   </View>
-                </>
+                </View>
               )}
             </View>
           </View>
 
           <View style={s.gtRow}>
             <Text style={s.gtText}>Grand Total</Text>
-            <Text style={s.gtText}>&#8377; {data.grandTotal.toFixed(2)}</Text>
+            <Text style={s.gtText}>INR {data.grandTotal.toFixed(2)}</Text>
           </View>
 
           <View style={s.amtWords}>
@@ -373,7 +373,6 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
               <Text style={s.bold}>Amount Chargeable (in words) : </Text>
               {amountToWords(data.grandTotal)}
             </Text>
-            <Text>E. &amp; O.E</Text>
           </View>
 
           {/* GST Summary */}
@@ -383,16 +382,16 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
               Taxable Value
             </Text>
             {isInterState ? (
-              <>
+              <View style={{ flexDirection: "row" }}>
                 <Text style={[s.gIgstHdr, s.bold]}>IGST</Text>
                 <Text style={[s.gTotHdr, s.bold]}>Total Tax Amount</Text>
-              </>
+              </View>
             ) : (
-              <>
+              <View style={{ flexDirection: "row" }}>
                 <Text style={[s.gCgstHdr, s.bold]}>CGST</Text>
                 <Text style={[s.gSgstHdr, s.bold]}>SGST/UTGST</Text>
                 <Text style={[s.gTotHdr, s.bold]}>Total Tax Amount</Text>
-              </>
+              </View>
             )}
           </View>
 
@@ -400,19 +399,19 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
             <Text style={s.gHsn}> </Text>
             <Text style={s.gTax}> </Text>
             {isInterState ? (
-              <>
+              <View style={{ flexDirection: "row" }}>
                 <Text style={s.gIgstRate}>Rate</Text>
                 <Text style={s.gIgstAmt}>Amount</Text>
-                <Text style={s.gTotal}> </Text>
-              </>
+                <Text style={s.gTotal}>{" "}</Text>
+              </View>
             ) : (
-              <>
+              <View style={{ flexDirection: "row" }}>
                 <Text style={s.gRate}>Rate</Text>
                 <Text style={s.gAmt}>Amount</Text>
                 <Text style={s.gRate}>Rate</Text>
                 <Text style={s.gAmt}>Amount</Text>
-                <Text style={s.gTotal}> </Text>
-              </>
+                <Text style={s.gTotal}>{" "}</Text>
+              </View>
             )}
           </View>
 
@@ -421,13 +420,13 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
               <Text style={s.gHsn}>{row.hsn}</Text>
               <Text style={s.gTax}>{row.taxableValue.toFixed(2)}</Text>
               {isInterState ? (
-                <>
+                <View style={{ flexDirection: "row" }}>
                   <Text style={s.gIgstRate}>{row.igstRate}%</Text>
                   <Text style={s.gIgstAmt}>{row.igstAmount.toFixed(2)}</Text>
                   <Text style={s.gTotal}>{row.igstAmount.toFixed(2)}</Text>
-                </>
+                </View>
               ) : (
-                <>
+                <View style={{ flexDirection: "row" }}>
                   <Text style={s.gRate}>{row.cgstRate}%</Text>
                   <Text style={s.gAmt}>{row.cgstAmount.toFixed(2)}</Text>
                   <Text style={s.gRate}>{row.sgstRate}%</Text>
@@ -435,7 +434,7 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
                   <Text style={s.gTotal}>
                     {(row.cgstAmount + row.sgstAmount).toFixed(2)}
                   </Text>
-                </>
+                </View>
               )}
             </View>
           ))}
@@ -444,19 +443,19 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
             <Text style={[s.gHsn, s.bold]}>Total</Text>
             <Text style={[s.gTax, s.bold]}>{data.taxableAmount.toFixed(2)}</Text>
             {isInterState ? (
-              <>
-                <Text style={s.gIgstRate}> </Text>
+              <View style={{ flexDirection: "row" }}>
+                <Text style={s.gIgstRate}>{" "}</Text>
                 <Text style={[s.gIgstAmt, s.bold]}>{data.igstTotal.toFixed(2)}</Text>
                 <Text style={[s.gTotal, s.bold]}>{data.igstTotal.toFixed(2)}</Text>
-              </>
+              </View>
             ) : (
-              <>
-                <Text style={s.gRate}> </Text>
+              <View style={{ flexDirection: "row" }}>
+                <Text style={s.gRate}>{" "}</Text>
                 <Text style={[s.gAmt, s.bold]}>{data.cgstTotal.toFixed(2)}</Text>
-                <Text style={s.gRate}> </Text>
+                <Text style={s.gRate}>{" "}</Text>
                 <Text style={[s.gAmt, s.bold]}>{data.sgstTotal.toFixed(2)}</Text>
                 <Text style={[s.gTotal, s.bold]}>{taxTotal.toFixed(2)}</Text>
-              </>
+              </View>
             )}
           </View>
 

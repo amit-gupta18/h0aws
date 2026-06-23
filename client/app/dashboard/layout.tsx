@@ -3,7 +3,7 @@ import { MobileNav } from '@/components/MobileNav'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-full flex-col md:flex-row">
+    <div className="flex min-h-full h-screen flex-col md:flex-row">
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Mobile Header */}

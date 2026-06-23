@@ -1,18 +1,27 @@
 import type { Role } from '@/shared/types'
 
+export type SidebarSubItem = {
+  label: string
+  href: string
+}
+
 export type SidebarItem = {
   label: string
   href: string
   icon: string
   roles: Role[]
+  children?: SidebarSubItem[]
 }
 
 export const sidebarItems: SidebarItem[] = [
   {
     label: 'Sales',
-    href: '/dashboard/sales/invoices',
+    href: '/dashboard/sales',
     icon: 'receipt',
     roles: ['OWNER', 'ACCOUNTANT'],
+    children: [
+      { label: 'Invoices', href: '/dashboard/sales/invoices' },
+    ],
   },
   {
     label: 'Customers',
@@ -43,5 +52,11 @@ export const sidebarItems: SidebarItem[] = [
     href: '/dashboard/team',
     icon: 'user-plus',
     roles: ['OWNER'],
+  },
+  {
+    label: 'Settings',
+    href: '/dashboard/settings',
+    icon: 'settings',
+    roles: ['OWNER', 'ACCOUNTANT', 'VIEWER'],
   },
 ]

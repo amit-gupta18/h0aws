@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import type { CreateBusinessInput } from "./business.schema.js";
+import type { CreateBusinessInput, UpdateBusinessInput } from "./business.schema.js";
 
 export const BusinessService = {
   /**
@@ -59,5 +59,104 @@ export const BusinessService = {
       gstin: r.business.gstin,
       stateCode: r.business.stateCode,
     }));
+  },
+
+  /** Get full business details. Only accessible by members. */
+  async getById(businessId: string, userId: string) {
+    const membership = await prisma.businessMember.findFirst({
+      where: { businessId, userId },
+    });
+    if (!membership) {
+      const err = new Error("Business not found") as Error & { status: number };
+      err.status = 404;
+      throw err;
+    }
+
+    const business = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: {
+        id: true,
+        tradeName: true,
+        legalName: true,
+        gstin: true,
+        gstinType: true,
+        address: true,
+        stateCode: true,
+        phone: true,
+        logoUrl: true,
+        createdAt: true,
+      },
+    });
+
+    const sequence = await prisma.invoiceSequence.findUnique({
+      where: { businessId },
+      select: { prefix: true },
+    });
+
+    return {
+      ...business,
+      invoicePrefix: sequence?.prefix ?? "",
+      role: membership.role,
+    };
+  },
+
+  /** Update business details. Only OWNER can update. */
+  async update(businessId: string, userId: string, input: UpdateBusinessInput) {
+    const membership = await prisma.businessMember.findFirst({
+      where: { businessId, userId },
+    });
+    if (!membership) {
+      const err = new Error("Business not found") as Error & { status: number };
+      err.status = 404;
+      throw err;
+    }
+    if (membership.role !== "OWNER") {
+      const err = new Error("Only owners can update business settings") as Error & { status: number };
+      err.status = 403;
+      throw err;
+    }
+
+    const { invoicePrefix, ...rest } = input;
+
+    // Filter out undefined values to satisfy Prisma's exactOptionalPropertyTypes
+    const businessData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(rest)) {
+      if (value !== undefined) {
+        businessData[key] = value;
+      }
+    }
+
+    const business = await prisma.business.update({
+      where: { id: businessId },
+      data: businessData,
+      select: {
+        id: true,
+        tradeName: true,
+        legalName: true,
+        gstin: true,
+        gstinType: true,
+        address: true,
+        stateCode: true,
+        phone: true,
+        logoUrl: true,
+      },
+    });
+
+    if (invoicePrefix) {
+      await prisma.invoiceSequence.update({
+        where: { businessId },
+        data: { prefix: invoicePrefix },
+      });
+    }
+
+    const sequence = await prisma.invoiceSequence.findUnique({
+      where: { businessId },
+      select: { prefix: true },
+    });
+
+    return {
+      ...business,
+      invoicePrefix: sequence?.prefix ?? "",
+    };
   },
 };
