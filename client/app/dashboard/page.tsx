@@ -50,8 +50,8 @@ export default function DashboardHome() {
   return (
     <div className="space-y-6">
       {/* Welcome */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold text-foreground">
             {biz ? `${biz.tradeName}` : 'Dashboard'}
           </h1>
@@ -59,7 +59,10 @@ export default function DashboardHome() {
         </div>
         <Link
           href="/dashboard/sales/invoices/new"
-          className={buttonVariants({ size: 'lg', className: 'shrink-0 whitespace-nowrap gap-1.5' })}
+          className={buttonVariants({
+            size: 'lg',
+            className: 'w-full shrink-0 gap-1.5 whitespace-nowrap sm:w-auto',
+          })}
         >
           <Plus size={18} />
           <span>New Invoice</span>
@@ -67,7 +70,7 @@ export default function DashboardHome() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">{monthName} Revenue</p>
           <p className="text-2xl font-bold text-primary font-mono">{isLoading ? '—' : fmt(monthRevenue)}</p>
@@ -107,14 +110,14 @@ export default function DashboardHome() {
         ) : (
           <div className="divide-y divide-border">
             {recentInvoices.map((inv) => (
-              <Link key={inv.id} href={`/dashboard/sales/invoices/${inv.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{inv.invoiceNumber}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+              <Link key={inv.id} href={`/dashboard/sales/invoices/${inv.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{inv.invoiceNumber}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
                     {inv.customerName ?? 'Walk-in'} · {new Date(inv.invoiceDate).toLocaleDateString('en-IN')}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold text-foreground font-mono">{fmt(inv.grandTotal)}</p>
                   <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                     inv.status === 'ISSUED' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'

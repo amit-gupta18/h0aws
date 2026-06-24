@@ -91,21 +91,21 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="shrink-0">
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl font-semibold">{invoice.invoiceNumber}</h1>
-            <p className="text-muted-foreground text-sm">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold sm:text-2xl">{invoice.invoiceNumber}</h1>
+            <p className="text-muted-foreground truncate text-sm">
               {invoice.invoiceDate} | {invoice.customer?.name ?? 'Walk-in Customer'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full px-3 py-1 text-sm font-medium ${
               invoice.status === 'ISSUED'
@@ -118,13 +118,13 @@ export default function InvoiceDetailPage() {
 
           {invoice.status === 'ISSUED' && (
             <>
-              <Button variant="outline" onClick={handleDownload}>
+              <Button variant="outline" onClick={handleDownload} className="w-full shrink-0 sm:w-auto">
                 <Download className="mr-2 h-4 w-4" />
                 Download PDF
               </Button>
 
               {canCancel && (
-                <Button variant="destructive" onClick={() => setShowConfirmCancel(true)}>
+                <Button variant="destructive" onClick={() => setShowConfirmCancel(true)} className="w-full shrink-0 sm:w-auto">
                   <XCircle className="mr-2 h-4 w-4" />
                   Cancel Invoice
                 </Button>
@@ -160,7 +160,7 @@ export default function InvoiceDetailPage() {
         <div className="space-y-6">
           <div className="rounded-lg border p-4">
             <h2 className="mb-3 font-medium">Invoice Details</h2>
-            <dl className="grid grid-cols-2 gap-2 text-sm">
+            <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
               <dt className="text-muted-foreground">Invoice Number</dt>
               <dd className="font-medium">{invoice.invoiceNumber}</dd>
               <dt className="text-muted-foreground">Date</dt>
@@ -177,7 +177,7 @@ export default function InvoiceDetailPage() {
           <div className="rounded-lg border p-4">
             <h2 className="mb-3 font-medium">Customer</h2>
             {invoice.customer ? (
-              <dl className="grid grid-cols-2 gap-2 text-sm">
+              <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 <dt className="text-muted-foreground">Name</dt>
                 <dd className="font-medium">{invoice.customer.name}</dd>
                 {invoice.customer.gstin && (
@@ -291,10 +291,10 @@ export default function InvoiceDetailPage() {
           )}
         </div>
 
-        <div className="hidden lg:block">
-          <div className="sticky top-6">
+        <div>
+          <div className="lg:sticky lg:top-6">
             <h2 className="mb-3 font-medium">Preview</h2>
-            <div className="h-[800px] overflow-hidden rounded-lg border">
+            <div className="h-[min(70vh,800px)] overflow-hidden rounded-lg border">
               <PDFViewer width="100%" height="100%" showToolbar={false}>
                 <Template data={templateData} />
               </PDFViewer>

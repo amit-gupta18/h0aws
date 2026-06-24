@@ -30,12 +30,12 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold text-foreground">Customers</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{customers.length} customer{customers.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="gap-2 h-9">
+        <Button onClick={() => setShowForm(true)} className="h-9 w-full shrink-0 gap-2 whitespace-nowrap sm:w-auto">
           <Plus size={15} /> Add Customer
         </Button>
       </div>

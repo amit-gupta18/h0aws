@@ -45,12 +45,12 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold text-foreground">Inventory</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{products.length} product{products.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="gap-2 h-9">
+        <Button onClick={() => setShowForm(true)} className="h-9 w-full shrink-0 gap-2 whitespace-nowrap sm:w-auto">
           <Plus size={15} /> Add Product
         </Button>
       </div>
@@ -199,20 +199,33 @@ export default function InventoryPage() {
             </div>
             <div className="divide-y divide-border">
               {products.map((p) => (
-                <div key={p.id} className="px-4 py-3.5 md:grid md:grid-cols-[1fr_80px_80px_100px_120px_120px] md:gap-4 md:items-center space-y-1 md:space-y-0">
-                  <div>
+                <div key={p.id} className="px-4 py-3.5 md:grid md:grid-cols-[1fr_80px_80px_100px_120px_120px] md:gap-4 md:items-center">
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">{p.name}</p>
                     {p.location && <p className="text-xs text-muted-foreground mt-0.5">{p.location}</p>}
                   </div>
-                  <p className="text-xs text-muted-foreground font-mono">{p.hsnCode ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">{p.unit}</p>
-                  <p className="text-xs text-muted-foreground">{p.gstRate}%</p>
-                  <p className="text-sm font-medium text-foreground font-mono">
-                    ₹{p.sellingPrice.toLocaleString('en-IN')}
-                  </p>
-                  <p className={`text-sm font-medium font-mono ${p.quantity > 0 ? 'text-success' : 'text-danger'}`}>
-                    {p.quantity} {p.unit}
-                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs md:contents">
+                    <p className="text-muted-foreground md:text-xs">
+                      <span className="font-medium text-foreground/70 md:hidden">HSN: </span>
+                      <span className="font-mono">{p.hsnCode ?? '—'}</span>
+                    </p>
+                    <p className="text-muted-foreground md:text-xs">
+                      <span className="font-medium text-foreground/70 md:hidden">Unit: </span>
+                      {p.unit}
+                    </p>
+                    <p className="text-muted-foreground md:text-xs">
+                      <span className="font-medium text-foreground/70 md:hidden">GST: </span>
+                      {p.gstRate}%
+                    </p>
+                    <p className="text-sm font-medium text-foreground font-mono md:text-sm">
+                      <span className="text-xs font-medium text-foreground/70 md:hidden">Price: </span>
+                      ₹{p.sellingPrice.toLocaleString('en-IN')}
+                    </p>
+                    <p className={`text-sm font-medium font-mono md:text-sm ${p.quantity > 0 ? 'text-success' : 'text-danger'}`}>
+                      <span className="text-xs font-medium text-foreground/70 md:hidden">Stock: </span>
+                      {p.quantity} {p.unit}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>

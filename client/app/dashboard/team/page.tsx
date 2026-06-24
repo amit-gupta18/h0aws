@@ -47,15 +47,15 @@ export default function TeamPage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold">Team</h1>
           <p className="text-muted-foreground text-sm">
             Add accountants and viewers, then hand them their login.
           </p>
         </div>
         {!showForm && (
-          <Button onClick={() => { setShowForm(true); setCreated(null) }}>
+          <Button onClick={() => { setShowForm(true); setCreated(null) }} className="w-full shrink-0 whitespace-nowrap sm:w-auto">
             <UserPlus size={16} /> Add member
           </Button>
         )}
@@ -134,13 +134,13 @@ export default function TeamPage() {
         </form>
       )}
 
-      <div className="rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         {isLoading ? (
           <div className="text-muted-foreground p-4 text-sm">Loading team…</div>
         ) : error ? (
           <div className="text-destructive p-4 text-sm">{error.message}</div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[480px] text-sm">
             <thead>
               <tr className="border-b text-left">
                 <th className="px-4 py-2 font-medium">Email</th>

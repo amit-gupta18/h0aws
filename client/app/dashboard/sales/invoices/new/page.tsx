@@ -3,11 +3,13 @@
 import { useState, useRef, useDeferredValue, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateInvoice } from '@/hooks/useInvoices'
+import { useBusiness } from '@/hooks/useBusinesses'
 import { useCustomerSearch, useCreateCustomer, type Customer } from '@/hooks/useCustomers'
 import { useProductSearch, type Product } from '@/hooks/useProducts'
 import { calculateGST } from '@/lib/gst-engine'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
+import { StateSelect } from '@/components/StateSelect'
 import { Plus, Trash2, Save } from 'lucide-react'
 
 type LineItem = {
@@ -51,7 +53,11 @@ export default function NewInvoicePage() {
 
   const memberships = useAuthStore((s) => s.memberships)
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
-  const activeBusiness = memberships.find((m) => m.businessId === activeBusinessId)
+  const activeMembership = memberships.find((m) => m.businessId === activeBusinessId)
+  const { data: business } = useBusiness(activeBusinessId)
+
+  const sellerGSTIN = business?.gstin ?? activeMembership?.gstin ?? null
+  const sellerStateCode = business?.stateCode ?? activeMembership?.stateCode ?? '00'
 
   const { data: customersData } = useCustomerSearch(deferredCustomerQuery, !!deferredCustomerQuery)
   const { data: productsData } = useProductSearch(deferredProductQuery, !!deferredProductQuery && activeItemIndex !== null)
@@ -61,8 +67,8 @@ export default function NewInvoicePage() {
 
   const gstResult = useMemo(() => {
     return calculateGST({
-      sellerGSTIN: activeBusiness?.gstin ?? null,
-      sellerStateCode: activeBusiness?.stateCode ?? '00',
+      sellerGSTIN,
+      sellerStateCode,
       buyerStateCode: selectedCustomer?.stateCode ?? null,
       items: items.map((item) => ({
         name: item.name,
@@ -72,7 +78,7 @@ export default function NewInvoicePage() {
         gstRate: item.gstRate,
       })),
     })
-  }, [items, activeBusiness, selectedCustomer])
+  }, [items, sellerGSTIN, sellerStateCode, selectedCustomer])
 
   const addItem = useCallback(() => {
     setItems((prev) => [
@@ -228,11 +234,11 @@ export default function NewInvoicePage() {
                 value={newCustomer.gstin}
                 onChange={(e) => setNewCustomer((p) => ({ ...p, gstin: e.target.value }))}
               />
-              <input
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="State Code"
+              <StateSelect
                 value={newCustomer.stateCode}
-                onChange={(e) => setNewCustomer((p) => ({ ...p, stateCode: e.target.value }))}
+                onValueChange={(stateCode) => setNewCustomer((p) => ({ ...p, stateCode }))}
+                placeholder="Select state"
+                triggerClassName="border-border bg-background dark:bg-background"
               />
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleCreateCustomer} disabled={!newCustomer.name}>
@@ -282,7 +288,7 @@ export default function NewInvoicePage() {
         </div>
 
         <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-muted/50">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Item Name</th>
@@ -471,13 +477,14 @@ export default function NewInvoicePage() {
         </div>
       </div>
 
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={() => router.back()}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">
           Cancel
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={createInvoice.isPending || items.every((i) => !i.name)}
+          className="w-full sm:w-auto"
         >
           <Save className="mr-2 h-4 w-4" />
           {createInvoice.isPending ? 'Creating...' : 'Create Invoice'}
