@@ -282,7 +282,7 @@ export default function NewInvoicePage() {
         </div>
 
         <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-muted/50">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Item Name</th>
@@ -471,13 +471,14 @@ export default function NewInvoicePage() {
         </div>
       </div>
 
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={() => router.back()}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">
           Cancel
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={createInvoice.isPending || items.every((i) => !i.name)}
+          className="w-full sm:w-auto"
         >
           <Save className="mr-2 h-4 w-4" />
           {createInvoice.isPending ? 'Creating...' : 'Create Invoice'}

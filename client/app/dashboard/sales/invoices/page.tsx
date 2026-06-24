@@ -18,22 +18,22 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold">Invoices</h1>
           <p className="text-muted-foreground text-sm">Manage your sales invoices</p>
         </div>
-        <Link href="/dashboard/sales/invoices/new">
-          <Button>
+        <Link href="/dashboard/sales/invoices/new" className="w-full sm:w-auto">
+          <Button className="w-full shrink-0 whitespace-nowrap sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             New Invoice
           </Button>
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:gap-4">
         <select
-          className="rounded-md border bg-background px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm lg:w-auto"
           value={filters.status ?? ''}
           onChange={(e) =>
             setFilters((f) => ({
@@ -50,7 +50,7 @@ export default function InvoicesPage() {
 
         <input
           type="date"
-          className="rounded-md border bg-background px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm lg:w-auto"
           placeholder="From"
           value={filters.from ?? ''}
           onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || undefined, page: 1 }))}
@@ -58,7 +58,7 @@ export default function InvoicesPage() {
 
         <input
           type="date"
-          className="rounded-md border bg-background px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm lg:w-auto"
           placeholder="To"
           value={filters.to ?? ''}
           onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || undefined, page: 1 }))}
@@ -66,7 +66,7 @@ export default function InvoicesPage() {
 
         <input
           type="text"
-          className="rounded-md border bg-background px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm sm:col-span-2 lg:col-span-1 lg:w-56"
           placeholder="Search invoice #"
           value={filters.search ?? ''}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value || undefined, page: 1 }))}
@@ -87,7 +87,7 @@ export default function InvoicesPage() {
       ) : (
         <>
           <div className="overflow-x-auto rounded-lg border">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-muted/50">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Invoice #</th>
@@ -135,7 +135,7 @@ export default function InvoicesPage() {
             </table>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-muted-foreground text-sm">
               Showing {(filters.page! - 1) * filters.limit! + 1} -{' '}
               {Math.min(filters.page! * filters.limit!, data.total)} of {data.total}

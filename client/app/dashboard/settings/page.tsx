@@ -137,7 +137,7 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-card border border-border rounded-lg p-6 space-y-5">
+        <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-5">
           <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
             Business Information
           </h2>
@@ -227,7 +227,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-lg p-6 space-y-5">
+        <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-5">
           <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
             GST Details
           </h2>
@@ -269,7 +269,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-lg p-6 space-y-5">
+        <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-5">
           <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
             Invoice Settings
           </h2>
