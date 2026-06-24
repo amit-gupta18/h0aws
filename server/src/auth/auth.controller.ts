@@ -6,6 +6,8 @@ import {
   ForgotPasswordSchema,
   VerifyOtpSchema,
   ResetPasswordSchema,
+  RefreshSchema,
+  LogoutSchema,
 } from "./auth.schema.js";
 
 import { handleError } from "../common/errors.js";
@@ -24,6 +26,20 @@ const COOKIE_OPTS: {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
+function getRefreshTokenFromRequest(req: Request): string | undefined {
+  const cookieToken = req.cookies["refreshToken"];
+  if (typeof cookieToken === "string" && cookieToken.length > 0) {
+    return cookieToken;
+  }
+
+  const bodyToken = req.body?.refreshToken;
+  if (typeof bodyToken === "string" && bodyToken.length > 0) {
+    return bodyToken;
+  }
+
+  return undefined;
+}
+
 export const AuthController = {
   async signup(req: Request, res: Response): Promise<void> {
     const parsed = SignupSchema.safeParse(req.body);
@@ -35,7 +51,12 @@ export const AuthController = {
       const { email, password, phone } = parsed.data;
       const result = await AuthService.signup(email, password, phone ?? null, req.headers["user-agent"]);
       res.cookie("refreshToken", result.refreshToken, COOKIE_OPTS);
-      res.status(201).json({ accessToken: result.accessToken, user: result.user, memberships: result.memberships });
+      res.status(201).json({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+        memberships: result.memberships,
+      });
     } catch (err) {
       handleError(err, res);
     }
@@ -51,14 +72,25 @@ export const AuthController = {
       const { email, password } = parsed.data;
       const result = await AuthService.login(email, password, req.headers["user-agent"]);
       res.cookie("refreshToken", result.refreshToken, COOKIE_OPTS);
-      res.json({ accessToken: result.accessToken, user: result.user, memberships: result.memberships });
+      res.json({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+        memberships: result.memberships,
+      });
     } catch (err) {
       handleError(err, res);
     }
   },
 
   async refresh(req: Request, res: Response): Promise<void> {
-    const raw: string | undefined = req.cookies["refreshToken"];
+    const parsed = RefreshSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+
+    const raw = getRefreshTokenFromRequest(req);
     if (!raw) {
       res.status(401).json({ error: "No refresh token" });
       return;
@@ -66,14 +98,25 @@ export const AuthController = {
     try {
       const result = await AuthService.refresh(raw, req.headers["user-agent"]);
       res.cookie("refreshToken", result.refreshToken, COOKIE_OPTS);
-      res.json({ accessToken: result.accessToken, user: result.user, memberships: result.memberships });
+      res.json({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+        memberships: result.memberships,
+      });
     } catch (err) {
       handleError(err, res);
     }
   },
 
   async logout(req: Request, res: Response): Promise<void> {
-    const raw: string | undefined = req.cookies["refreshToken"];
+    const parsed = LogoutSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+
+    const raw = getRefreshTokenFromRequest(req);
     if (raw) await AuthService.logout(raw);
     res.clearCookie("refreshToken");
     res.json({ message: "Logged out" });
