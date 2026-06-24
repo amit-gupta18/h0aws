@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLogin } from '@/hooks/useAuth'
-import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 
 export default function LoginPage() {
@@ -16,32 +15,12 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    console.log('[LoginPage] Form submitted')
     try {
       const data = await login.mutateAsync({ email, password })
       const target = data.memberships.length > 0 ? '/dashboard' : '/onboarding'
-      console.log('[LoginPage] Login successful, navigating to', target, { memberships: data.memberships.length })
-      
-      // Small delay to ensure state is committed before navigation
-      await new Promise(resolve => setTimeout(resolve, 100))
-      console.log('[LoginPage] After delay, store state:', {
-        hasToken: !!useAuthStore.getState().accessToken,
-        isHydrated: useAuthStore.getState().isHydrated,
-        memberships: useAuthStore.getState().memberships.length
-      })
-      
       router.push(target)
-      console.log('[LoginPage] router.push called')
-      
-      // Fallback: if router.push doesn't work, use window.location after a delay
-      setTimeout(() => {
-        if (window.location.pathname !== target) {
-          console.log('[LoginPage] router.push did not navigate, using window.location')
-          window.location.href = target
-        }
-      }, 500)
-    } catch (err) {
-      console.log('[LoginPage] Login failed', { error: err instanceof Error ? err.message : String(err) })
+    } catch {
+      // error is surfaced via login.error
     }
   }
 

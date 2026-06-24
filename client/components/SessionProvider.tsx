@@ -13,10 +13,6 @@ interface RefreshResponse {
   memberships: Membership[]
 }
 
-function log(message: string, data?: unknown) {
-  console.log(`[SessionProvider] ${message}`, data ?? '')
-}
-
 let sessionRestoreAttempted = false
 
 export default function SessionProvider({ children }: { children: React.ReactNode }) {
@@ -26,38 +22,23 @@ export default function SessionProvider({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const state = useAuthStore.getState()
-    log('useEffect triggered', { 
-      sessionRestoreAttempted,
-      hasToken: !!state.accessToken, 
-      isHydrated: state.isHydrated 
-    })
 
     if (sessionRestoreAttempted) {
-      log('Session restore already attempted globally, skipping')
-      if (!state.isHydrated) {
-        setHydrated()
-      }
+      if (!state.isHydrated) setHydrated()
       return
     }
     sessionRestoreAttempted = true
 
-    if (state.isHydrated) {
-      log('Already hydrated, skipping')
-      return
-    }
+    if (state.isHydrated) return
 
     if (state.accessToken) {
-      log('Token exists in store, marking hydrated')
       setHydrated()
       return
     }
 
-    log('No token, attempting refresh...', { baseUrl: BASE_URL })
-
     ky.post(`${BASE_URL}/auth/refresh`, { credentials: 'include' })
       .json<RefreshResponse>()
       .then((data) => {
-        log('Refresh successful', { userId: data.user.id, memberships: data.memberships.length })
         setSession({
           userId: data.user.id,
           email: data.user.email,
@@ -65,10 +46,8 @@ export default function SessionProvider({ children }: { children: React.ReactNod
           memberships: data.memberships,
         })
       })
-      .catch((err) => {
-        log('Refresh failed', { error: err instanceof Error ? err.message : String(err) })
+      .catch(() => {
         if (!useAuthStore.getState().accessToken) {
-          log('No token after refresh failure, clearing auth')
           clearAuth()
         }
       })
