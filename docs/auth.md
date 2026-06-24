@@ -455,3 +455,162 @@ server/src/auth/
 | Reset token expired | 400 — restart forgot-password flow |
 | Logout with no cookie | 200 — idempotent |
 | Stolen refresh token used | Legitimate user's next refresh 401s (token already consumed by attacker) |
+
+---
+
+## Client-side auth protection (AuthGuard)
+
+### The Problem
+
+After login, the client would sometimes fail to redirect to `/dashboard`, or the dashboard would render in a broken state. This happened due to a **hydration timing issue**:
+
+```
+┌───────────────────────────────────────────────────────────────────────────── ┐
+│                        BEFORE (Race Condition)                               │
+├───────────────────────────────────────────────────────────────────────────── ┤
+│                                                                              │
+│   User clicks Login                                                          │
+│         │                                                                    │
+│         ▼                                                                    │
+│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                    │
+│   │  POST       │     │  onSuccess  │     │  Navigate   │                    │
+│   │  /login     │────▶│  setSession │────▶│  /dashboard │                    │
+│   │  (API)      │     │  (Zustand)  │     │  (router)   │                    │
+│   └─────────────┘     └─────────────┘     └─────────────┘                    │
+│                              │                   │                           │
+│                              │                   ▼                           │
+│                              │         ┌─────────────────┐                   │
+│                              │         │ Dashboard loads │                   │
+│                              │         │ SessionProvider │                   │
+│                              │         │ runs useEffect  │                   │
+│                              │         └────────┬────────┘                   │
+│                              │                  │                            │
+│                              │                  ▼                            │
+│                              │         accessToken === null?                 │
+│                              │         (Zustand not yet updated              │
+│                              │          from previous setSession)            │
+│                              │                  │                            │
+│                              │                  ▼                            │
+│                              │         POST /auth/refresh                    │
+│                              │         (unnecessary, may fail                │
+│                              │          if cross-origin cookie issue)        │
+│                              │                  │                            │
+│                              │                  ▼                            │
+│                              │         401 → clearAuth()                     │
+│                              │         User stuck on dashboard               │
+│                              │         with no data, or infinite loop        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────── ──┘
+```
+
+**Root causes:**
+
+1. **No hydration tracking**: Zustand state starts as `null`. Components couldn't distinguish between "not yet loaded" vs "definitely not authenticated".
+
+2. **SessionProvider always tried refresh**: On mount, if `accessToken === null`, it would call `/auth/refresh`. But after a fresh login, the token was in Zustand memory — just not propagated to the new page's component tree yet.
+
+3. **No route protection**: Dashboard pages would render and make API calls even when auth state was uncertain, leading to broken UI or redirect loops.
+
+4. **Cross-origin cookie issues in production**: `sameSite: 'lax'` cookies aren't sent on cross-origin POST requests. The `/auth/refresh` call would fail silently, and without proper state tracking, the user got stuck.
+
+### The Solution
+
+```
+┌──────────────────────────────────────────────────────────────────────────── ─┐
+│                         AFTER (With AuthGuard)                               │
+├──────────────────────────────────────────────────────────────────────────── ─┤
+│                                                                              │
+│   App mounts (any page)                                                      │
+│         │                                                                    │
+│         ▼                                                                    │
+│   ┌─────────────────┐                                                        │
+│   │ SessionProvider │                                                        │
+│   │ checks token    │                                                        │
+│   └────────┬────────┘                                                        │
+│            │                                                                 │
+│            ▼                                                                 │
+│   ┌────────────────────┐          ┌────────────────────┐                     │
+│   │ accessToken exists │    NO    │ POST /auth/refresh │                     │
+│   │ in Zustand?        │─────────▶│ (cookie attached)  │                     │
+│   └────────┬───────────┘          └─────────┬──────────┘                     │
+│            │ YES                            │                                │
+│            ▼                                ▼                                │
+│   ┌────────────────┐              ┌─────────────────────┐                    │ 
+│   │ setHydrated()  │              │ Success? setSession │                    │
+│   │ isHydrated=true│              │ Fail? clearAuth()   │                    │
+│   └────────┬───────┘              │ (both set hydrated) │                    │
+│            │                      └─────────┬───────────┘                    │
+│            │                                │                                │
+│            └────────────┬───────────────────┘                                │
+│                         │                                                    │
+│                         ▼                                                    │
+│            ┌────────────────────────┐                                        │
+│            │   isHydrated = true    │                                        │
+│            │   Auth state is known  │                                        │
+│            └────────────┬───────────┘                                        │
+│                         │                                                    │
+│                         ▼                                                    │
+│   ┌─────────────────────────────────────────────────────┐                    │
+│   │                   AuthGuard                         │                    │
+│   │  (wraps /dashboard layout)                          │                    │
+│   │                                                     │                    │
+│   │  if (!isHydrated)     → show spinner                │                    │
+│   │  if (!accessToken)    → redirect /login             │                    │
+│   │  if (memberships=[])  → redirect /onboarding        │                    │
+│   │  else                 → render children             │                    │
+│   └─────────────────────────────────────────────────────┘                    │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Changes made:**
+
+1. **Added `isHydrated` flag to Zustand store** (`store/authStore.ts`):
+   - Starts as `false`
+   - Set to `true` after session restore completes (success or failure)
+   - Set to `true` on login/signup (via `setSession`)
+   - Set to `true` on logout (via `clearAuth`)
+
+2. **Updated SessionProvider** (`components/SessionProvider.tsx`):
+   - Calls `setHydrated()` if token already exists (no refresh needed)
+   - Both success and failure paths now set `isHydrated = true`
+
+3. **Created AuthGuard component** (`components/AuthGuard.tsx`):
+   - Waits for `isHydrated` before making any decisions
+   - Redirects to `/login` if no token after hydration
+   - Redirects to `/onboarding` if authenticated but no memberships
+   - Shows spinner while hydrating
+
+4. **Applied AuthGuard to dashboard layout** (`app/dashboard/layout.tsx`):
+   - All dashboard routes are now protected
+   - Prevents rendering with uncertain auth state
+
+### File map (client auth)
+
+```
+client/
+├── store/authStore.ts        ← Zustand: added isHydrated flag, setHydrated action
+├── components/
+│   ├── SessionProvider.tsx   ← Calls setHydrated after restore attempt
+│   └── AuthGuard.tsx         ← Route protection, waits for hydration
+├── app/
+│   ├── dashboard/layout.tsx  ← Wrapped with AuthGuard
+│   └── (auth)/
+│       ├── login/page.tsx    ← Uses router.push (not window.location)
+│       └── signup/page.tsx   ← Uses router.push (not window.location)
+└── lib/api.ts                ← ky client with 401 → refresh → retry
+```
+
+### Why `window.location.href` was problematic
+
+The login page originally used `window.location.href = '/dashboard'` after successful login. This caused a **full page reload**, which:
+
+1. Destroys the current React tree and Zustand state
+2. Loads a fresh page where `accessToken = null` initially
+3. Triggers SessionProvider to call `/auth/refresh`
+4. If cross-origin cookies fail, user gets logged out
+
+**Fix:** Use `router.push('/dashboard')` from `next/navigation`, which:
+- Performs client-side navigation
+- Preserves Zustand state in memory
+- No unnecessary refresh call needed
