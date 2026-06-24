@@ -12,8 +12,20 @@ type AuthResponse = {
   memberships: Membership[]
 }
 
-function log(message: string, data?: unknown) {
-  console.log(`[useAuth] ${message}`, data ?? '')
+type ApiErrorBody = {
+  error?: string | { fieldErrors?: Record<string, string[]>; formErrors?: string[] }
+}
+
+function parseApiError(body: ApiErrorBody): string {
+  const { error } = body
+  if (typeof error === 'string') return error
+  if (error && typeof error === 'object') {
+    const fieldMessage = Object.values(error.fieldErrors ?? {}).flat()[0]
+    if (fieldMessage) return fieldMessage
+    const formMessage = error.formErrors?.[0]
+    if (formMessage) return formMessage
+  }
+  return 'Something went wrong'
 }
 
 async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
@@ -21,8 +33,8 @@ async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
     return await fn()
   } catch (err) {
     if (err instanceof HTTPError) {
-      const body = await err.response.json<{ error?: string }>().catch((): { error?: string } => ({}))
-      throw new Error(body.error ?? 'Something went wrong')
+      const body = await err.response.json<ApiErrorBody>().catch((): ApiErrorBody => ({}))
+      throw new Error(parseApiError(body))
     }
     throw new Error('Could not reach the server')
   }
@@ -31,62 +43,34 @@ async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
 export function useLogin() {
   const setSession = useAuthStore((s) => s.setSession)
   return useMutation({
-    mutationFn: async (data: { email: string; password: string }) => {
-      log('Login attempt', { email: data.email })
-      const result = await apiCall(() =>
+    mutationFn: (data: { email: string; password: string }) =>
+      apiCall(() =>
         api.post('auth/login', { json: data, credentials: 'include' }).json<AuthResponse>()
-      )
-      log('Login response received', { userId: result.user.id, memberships: result.memberships.length })
-      return result
-    },
-    onSuccess: ({ accessToken, user, memberships }) => {
-      log('Login onSuccess, calling setSession', { userId: user.id, memberships: memberships.length })
-      setSession({ userId: user.id, email: user.email, accessToken, memberships })
-      log('setSession completed')
-    },
-    onError: (err) => {
-      log('Login error', { error: err.message })
-    },
+      ),
+    onSuccess: ({ accessToken, user, memberships }) =>
+      setSession({ userId: user.id, email: user.email, accessToken, memberships }),
   })
 }
 
 export function useSignup() {
   const setSession = useAuthStore((s) => s.setSession)
   return useMutation({
-    mutationFn: async (data: { email: string; password: string; phone?: string }) => {
-      log('Signup attempt', { email: data.email })
-      const result = await apiCall(() =>
+    mutationFn: (data: { email: string; password: string; phone?: string }) =>
+      apiCall(() =>
         api.post('auth/signup', { json: data, credentials: 'include' }).json<AuthResponse>()
-      )
-      log('Signup response received', { userId: result.user.id })
-      return result
-    },
-    onSuccess: ({ accessToken, user, memberships }) => {
-      log('Signup onSuccess, calling setSession')
-      setSession({ userId: user.id, email: user.email, accessToken, memberships })
-    },
-    onError: (err) => {
-      log('Signup error', { error: err.message })
-    },
+      ),
+    onSuccess: ({ accessToken, user, memberships }) =>
+      setSession({ userId: user.id, email: user.email, accessToken, memberships }),
   })
 }
 
 export function useLogout() {
   const clearAuth = useAuthStore((s) => s.clearAuth)
   return useMutation({
-    mutationFn: async () => {
-      log('Logout attempt')
-      await apiCall(() => api.post('auth/logout', { credentials: 'include' }).json<void>())
-      log('Logout API success')
-    },
-    onSuccess: () => {
-      log('Logout onSuccess, clearing auth')
-      clearAuth()
-    },
-    onError: (err) => {
-      log('Logout error, still clearing auth', { error: err.message })
-      clearAuth()
-    },
+    mutationFn: () =>
+      apiCall(() => api.post('auth/logout', { credentials: 'include' }).json<void>()),
+    onSuccess: () => clearAuth(),
+    onError: () => clearAuth(),
   })
 }
 
