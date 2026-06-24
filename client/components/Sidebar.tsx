@@ -90,11 +90,15 @@ function NavItem({ item, pathname }: { item: SidebarItem; pathname: string }) {
   )
 }
 
-function SidebarSkeleton({ className }: { className?: string }) {
+function SidebarSkeleton({ className, forceShow = false }: { className?: string; forceShow?: boolean }) {
   const navItemCount = 6
 
   return (
-    <nav className={cn("hidden md:flex flex-col w-56 shrink-0 border-r border-border h-full bg-sidebar", className)}>
+    <nav className={cn(
+      "flex-col w-56 shrink-0 border-r border-border h-full bg-sidebar",
+      forceShow ? "flex" : "hidden md:flex",
+      className
+    )}>
       {/* Business header skeleton */}
       <div className="px-5 pt-4 pb-3 border-b border-border">
         <div
@@ -135,8 +139,9 @@ function SidebarSkeleton({ className }: { className?: string }) {
   )
 }
 
-export default function Sidebar({ className }: { className?: string }) {
+export default function Sidebar({ className, forceShow = false }: { className?: string; forceShow?: boolean }) {
   const role = useActiveRole()
+  const isHydrated = useAuthStore((s) => s.isHydrated)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -149,7 +154,7 @@ export default function Sidebar({ className }: { className?: string }) {
 
   const logout = useLogout()
 
-  if (!role) return <SidebarSkeleton className={className} />
+  if (!isHydrated || !role) return <SidebarSkeleton className={className} forceShow={forceShow} />
 
   const visibleItems = sidebarItems.filter((item) => item.roles.includes(role))
   const activeBusiness = memberships.find((m) => m.businessId === activeBusinessId)
@@ -161,7 +166,11 @@ export default function Sidebar({ className }: { className?: string }) {
   }
 
   return (
-    <nav className={cn("hidden md:flex flex-col w-56 shrink-0 border-r border-border h-full bg-sidebar", className)}>
+    <nav className={cn(
+      "flex-col w-56 shrink-0 border-r border-border h-full bg-sidebar",
+      forceShow ? "flex" : "hidden md:flex",
+      className
+    )}>
       {memberships.length > 1 && (
         <div className="px-3 pt-4 pb-2 border-b border-border space-y-1">
           <p className="text-xs text-muted-foreground px-2 mb-1 flex items-center gap-1">

@@ -16,7 +16,7 @@ export function MobileNav() {
       </SheetTrigger>
       <SheetContent side="left" className="p-0 w-56 flex flex-col">
         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-        <Sidebar className="w-full border-r-0" />
+        <Sidebar className="w-full border-r-0" forceShow />
       </SheetContent>
     </Sheet>
   )

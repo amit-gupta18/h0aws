@@ -14,14 +14,17 @@ interface RefreshResponse {
 }
 
 export default function SessionProvider({ children }: { children: React.ReactNode }) {
-  const { accessToken, setSession, clearAuth } = useAuthStore()
+  const { accessToken, setSession, clearAuth, setHydrated, isHydrated } = useAuthStore()
   const restored = useRef(false)
 
   useEffect(() => {
     if (restored.current) return
     restored.current = true
 
-    if (accessToken) return
+    if (accessToken) {
+      setHydrated()
+      return
+    }
 
     ky.post(`${BASE_URL}/auth/refresh`, { credentials: 'include' })
       .json<RefreshResponse>()

@@ -7,6 +7,7 @@ type AuthState = {
   accessToken: string | null
   memberships: Membership[]
   activeBusinessId: string | null
+  isHydrated: boolean
 
   /** Populate from a login/signup response. Auto-selects the active business when there's exactly one. */
   setSession: (p: { userId: string; email: string; accessToken: string; memberships: Membership[] }) => void
@@ -17,6 +18,8 @@ type AuthState = {
   /** After creating a business via onboarding — append it and make it active. */
   addMembership: (m: Membership) => void
   clearAuth: () => void
+  /** Mark the store as hydrated (session restore complete). */
+  setHydrated: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -25,6 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   memberships: [],
   activeBusinessId: null,
+  isHydrated: false,
 
   setSession: ({ userId, email, accessToken, memberships }) =>
     set({
@@ -33,6 +37,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       accessToken,
       memberships,
       activeBusinessId: memberships.length > 0 ? memberships[0].businessId : null,
+      isHydrated: true,
     }),
 
   setAccessToken: (accessToken) => set({ accessToken }),
@@ -46,7 +51,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     })),
 
   clearAuth: () =>
-    set({ userId: null, email: null, accessToken: null, memberships: [], activeBusinessId: null }),
+    set({ userId: null, email: null, accessToken: null, memberships: [], activeBusinessId: null, isHydrated: true }),
+
+  setHydrated: () => set({ isHydrated: true }),
 }))
 
 /** Role in the currently-active business, or null if none is selected. */
