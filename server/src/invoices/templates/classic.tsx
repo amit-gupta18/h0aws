@@ -107,6 +107,7 @@ const s = StyleSheet.create({
   gRate: { width: "10%", padding: 3, borderRight: THIN, textAlign: "right" },
   gAmt: { width: "11%", padding: 3, borderRight: THIN, textAlign: "right" },
   gTotal: { width: "27%", padding: 3, textAlign: "right" },
+  subHdr: { textAlign: "center" },
   gIgstHdr: { width: "42%", padding: 3, borderRight: THIN, borderBottom: THIN, textAlign: "center" },
   gIgstRate: { width: "21%", padding: 3, borderRight: THIN, textAlign: "right" },
   gIgstAmt: { width: "21%", padding: 3, borderRight: THIN, textAlign: "right" },
@@ -419,16 +420,16 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
             <Text style={s.gTax}> </Text>
             {isInterState ? (
               <React.Fragment>
-                <Text style={s.gIgstRate}>Rate</Text>
-                <Text style={s.gIgstAmt}>Amount</Text>
+                <Text style={[s.gIgstRate, s.subHdr]}>Rate</Text>
+                <Text style={[s.gIgstAmt, s.subHdr]}>Amount</Text>
                 <Text style={s.gTotal}> </Text>
               </React.Fragment>
             ) : (
               <React.Fragment>
-                <Text style={s.gRate}>Rate</Text>
-                <Text style={s.gAmt}>Amount</Text>
-                <Text style={s.gRate}>Rate</Text>
-                <Text style={s.gAmt}>Amount</Text>
+                <Text style={[s.gRate, s.subHdr]}>Rate</Text>
+                <Text style={[s.gAmt, s.subHdr]}>Amount</Text>
+                <Text style={[s.gRate, s.subHdr]}>Rate</Text>
+                <Text style={[s.gAmt, s.subHdr]}>Amount</Text>
                 <Text style={s.gTotal}> </Text>
               </React.Fragment>
             )}
