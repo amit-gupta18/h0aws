@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import ky from 'ky'
 import { useAuthStore } from '@/store/authStore'
 import type { Membership } from '@/shared/types'
@@ -17,20 +17,36 @@ function log(message: string, data?: unknown) {
   console.log(`[SessionProvider] ${message}`, data ?? '')
 }
 
+let sessionRestoreAttempted = false
+
 export default function SessionProvider({ children }: { children: React.ReactNode }) {
-  const { accessToken, setSession, clearAuth, setHydrated, isHydrated } = useAuthStore()
-  const restored = useRef(false)
+  const setSession = useAuthStore((s) => s.setSession)
+  const clearAuth = useAuthStore((s) => s.clearAuth)
+  const setHydrated = useAuthStore((s) => s.setHydrated)
 
   useEffect(() => {
-    log('useEffect triggered', { restored: restored.current, hasToken: !!accessToken, isHydrated })
+    const state = useAuthStore.getState()
+    log('useEffect triggered', { 
+      sessionRestoreAttempted,
+      hasToken: !!state.accessToken, 
+      isHydrated: state.isHydrated 
+    })
 
-    if (restored.current) {
-      log('Already restored, skipping')
+    if (sessionRestoreAttempted) {
+      log('Session restore already attempted globally, skipping')
+      if (!state.isHydrated) {
+        setHydrated()
+      }
       return
     }
-    restored.current = true
+    sessionRestoreAttempted = true
 
-    if (accessToken) {
+    if (state.isHydrated) {
+      log('Already hydrated, skipping')
+      return
+    }
+
+    if (state.accessToken) {
       log('Token exists in store, marking hydrated')
       setHydrated()
       return
@@ -56,7 +72,7 @@ export default function SessionProvider({ children }: { children: React.ReactNod
           clearAuth()
         }
       })
-  }, [])
+  }, [setSession, clearAuth, setHydrated])
 
   return <>{children}</>
 }
