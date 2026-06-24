@@ -4,45 +4,10 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useBusiness, useUpdateBusiness } from '@/hooks/useBusinesses'
 import { Button } from '@/components/ui/button'
+import { StateSelect } from '@/components/StateSelect'
 
-const STATE_CODES: Record<string, string> = {
-  '01': 'Jammu & Kashmir',
-  '02': 'Himachal Pradesh',
-  '03': 'Punjab',
-  '04': 'Chandigarh',
-  '05': 'Uttarakhand',
-  '06': 'Haryana',
-  '07': 'Delhi',
-  '08': 'Rajasthan',
-  '09': 'Uttar Pradesh',
-  '10': 'Bihar',
-  '11': 'Sikkim',
-  '12': 'Arunachal Pradesh',
-  '13': 'Nagaland',
-  '14': 'Manipur',
-  '15': 'Mizoram',
-  '16': 'Tripura',
-  '17': 'Meghalaya',
-  '18': 'Assam',
-  '19': 'West Bengal',
-  '20': 'Jharkhand',
-  '21': 'Odisha',
-  '22': 'Chhattisgarh',
-  '23': 'Madhya Pradesh',
-  '24': 'Gujarat',
-  '26': 'Dadra & Nagar Haveli and Daman & Diu',
-  '27': 'Maharashtra',
-  '29': 'Karnataka',
-  '30': 'Goa',
-  '31': 'Lakshadweep',
-  '32': 'Kerala',
-  '33': 'Tamil Nadu',
-  '34': 'Puducherry',
-  '35': 'Andaman & Nicobar Islands',
-  '36': 'Telangana',
-  '37': 'Andhra Pradesh',
-  '38': 'Ladakh',
-}
+const inputClass =
+  'w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed'
 
 export default function SettingsPage() {
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
@@ -157,6 +122,9 @@ export default function SettingsPage() {
                 className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Your business name"
               />
+              <p className="text-xs text-muted-foreground">
+                Appears on your invoice as the business name.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -172,6 +140,9 @@ export default function SettingsPage() {
                 className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Registered legal name"
               />
+              <p className="text-xs text-muted-foreground">
+                Optional. Also printed on invoices when provided.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -193,21 +164,13 @@ export default function SettingsPage() {
               <label className="text-sm font-medium text-foreground" htmlFor="stateCode">
                 State <span className="text-danger">*</span>
               </label>
-              <select
+              <StateSelect
                 id="stateCode"
-                required
-                disabled={!isOwner}
                 value={formData.stateCode}
-                onChange={(e) => setFormData({ ...formData, stateCode: e.target.value })}
-                className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">Select state</option>
-                {Object.entries(STATE_CODES).map(([code, name]) => (
-                  <option key={code} value={code}>
-                    {name} ({code})
-                  </option>
-                ))}
-              </select>
+                onValueChange={(stateCode) => setFormData({ ...formData, stateCode })}
+                placeholder="Select state"
+                disabled={!isOwner}
+              />
             </div>
 
             <div className="space-y-1.5 md:col-span-2">

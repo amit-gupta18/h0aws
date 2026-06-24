@@ -3,11 +3,13 @@
 import { useState, useRef, useDeferredValue, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateInvoice } from '@/hooks/useInvoices'
+import { useBusiness } from '@/hooks/useBusinesses'
 import { useCustomerSearch, useCreateCustomer, type Customer } from '@/hooks/useCustomers'
 import { useProductSearch, type Product } from '@/hooks/useProducts'
 import { calculateGST } from '@/lib/gst-engine'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
+import { StateSelect } from '@/components/StateSelect'
 import { Plus, Trash2, Save } from 'lucide-react'
 
 type LineItem = {
@@ -51,7 +53,11 @@ export default function NewInvoicePage() {
 
   const memberships = useAuthStore((s) => s.memberships)
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
-  const activeBusiness = memberships.find((m) => m.businessId === activeBusinessId)
+  const activeMembership = memberships.find((m) => m.businessId === activeBusinessId)
+  const { data: business } = useBusiness(activeBusinessId)
+
+  const sellerGSTIN = business?.gstin ?? activeMembership?.gstin ?? null
+  const sellerStateCode = business?.stateCode ?? activeMembership?.stateCode ?? '00'
 
   const { data: customersData } = useCustomerSearch(deferredCustomerQuery, !!deferredCustomerQuery)
   const { data: productsData } = useProductSearch(deferredProductQuery, !!deferredProductQuery && activeItemIndex !== null)
@@ -61,8 +67,8 @@ export default function NewInvoicePage() {
 
   const gstResult = useMemo(() => {
     return calculateGST({
-      sellerGSTIN: activeBusiness?.gstin ?? null,
-      sellerStateCode: activeBusiness?.stateCode ?? '00',
+      sellerGSTIN,
+      sellerStateCode,
       buyerStateCode: selectedCustomer?.stateCode ?? null,
       items: items.map((item) => ({
         name: item.name,
@@ -72,7 +78,7 @@ export default function NewInvoicePage() {
         gstRate: item.gstRate,
       })),
     })
-  }, [items, activeBusiness, selectedCustomer])
+  }, [items, sellerGSTIN, sellerStateCode, selectedCustomer])
 
   const addItem = useCallback(() => {
     setItems((prev) => [
@@ -228,11 +234,11 @@ export default function NewInvoicePage() {
                 value={newCustomer.gstin}
                 onChange={(e) => setNewCustomer((p) => ({ ...p, gstin: e.target.value }))}
               />
-              <input
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="State Code"
+              <StateSelect
                 value={newCustomer.stateCode}
-                onChange={(e) => setNewCustomer((p) => ({ ...p, stateCode: e.target.value }))}
+                onValueChange={(stateCode) => setNewCustomer((p) => ({ ...p, stateCode }))}
+                placeholder="Select state"
+                triggerClassName="border-border bg-background dark:bg-background"
               />
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleCreateCustomer} disabled={!newCustomer.name}>

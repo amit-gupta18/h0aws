@@ -17,6 +17,7 @@ type CreateBusinessInput = {
   invoicePrefix: string
   legalName?: string
   gstin?: string
+  gstinType?: 'REGULAR' | 'COMPOSITION' | 'UNREGISTERED'
   address?: string
   phone?: string
 }
