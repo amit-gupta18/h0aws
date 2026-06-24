@@ -12,6 +12,10 @@ type AuthResponse = {
   memberships: Membership[]
 }
 
+function log(message: string, data?: unknown) {
+  console.log(`[useAuth] ${message}`, data ?? '')
+}
+
 async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
@@ -27,34 +31,62 @@ async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
 export function useLogin() {
   const setSession = useAuthStore((s) => s.setSession)
   return useMutation({
-    mutationFn: (data: { email: string; password: string }) =>
-      apiCall(() =>
+    mutationFn: async (data: { email: string; password: string }) => {
+      log('Login attempt', { email: data.email })
+      const result = await apiCall(() =>
         api.post('auth/login', { json: data, credentials: 'include' }).json<AuthResponse>()
-      ),
-    onSuccess: ({ accessToken, user, memberships }) =>
-      setSession({ userId: user.id, email: user.email, accessToken, memberships }),
+      )
+      log('Login response received', { userId: result.user.id, memberships: result.memberships.length })
+      return result
+    },
+    onSuccess: ({ accessToken, user, memberships }) => {
+      log('Login onSuccess, calling setSession', { userId: user.id, memberships: memberships.length })
+      setSession({ userId: user.id, email: user.email, accessToken, memberships })
+      log('setSession completed')
+    },
+    onError: (err) => {
+      log('Login error', { error: err.message })
+    },
   })
 }
 
 export function useSignup() {
   const setSession = useAuthStore((s) => s.setSession)
   return useMutation({
-    mutationFn: (data: { email: string; password: string; phone?: string }) =>
-      apiCall(() =>
+    mutationFn: async (data: { email: string; password: string; phone?: string }) => {
+      log('Signup attempt', { email: data.email })
+      const result = await apiCall(() =>
         api.post('auth/signup', { json: data, credentials: 'include' }).json<AuthResponse>()
-      ),
-    onSuccess: ({ accessToken, user, memberships }) =>
-      setSession({ userId: user.id, email: user.email, accessToken, memberships }),
+      )
+      log('Signup response received', { userId: result.user.id })
+      return result
+    },
+    onSuccess: ({ accessToken, user, memberships }) => {
+      log('Signup onSuccess, calling setSession')
+      setSession({ userId: user.id, email: user.email, accessToken, memberships })
+    },
+    onError: (err) => {
+      log('Signup error', { error: err.message })
+    },
   })
 }
 
 export function useLogout() {
   const clearAuth = useAuthStore((s) => s.clearAuth)
   return useMutation({
-    mutationFn: () =>
-      apiCall(() => api.post('auth/logout', { credentials: 'include' }).json<void>()),
-    onSuccess: () => clearAuth(),
-    onError: () => clearAuth(),
+    mutationFn: async () => {
+      log('Logout attempt')
+      await apiCall(() => api.post('auth/logout', { credentials: 'include' }).json<void>())
+      log('Logout API success')
+    },
+    onSuccess: () => {
+      log('Logout onSuccess, clearing auth')
+      clearAuth()
+    },
+    onError: (err) => {
+      log('Logout error, still clearing auth', { error: err.message })
+      clearAuth()
+    },
   })
 }
 

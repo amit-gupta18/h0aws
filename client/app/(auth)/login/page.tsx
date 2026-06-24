@@ -15,12 +15,15 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    console.log('[LoginPage] Form submitted')
     try {
       const data = await login.mutateAsync({ email, password })
       const target = data.memberships.length > 0 ? '/dashboard' : '/onboarding'
+      console.log('[LoginPage] Login successful, navigating to', target, { memberships: data.memberships.length })
       router.push(target)
-    } catch {
-      // error is surfaced via login.error
+      console.log('[LoginPage] router.push called')
+    } catch (err) {
+      console.log('[LoginPage] Login failed', { error: err instanceof Error ? err.message : String(err) })
     }
   }
 
