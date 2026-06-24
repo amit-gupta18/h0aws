@@ -202,6 +202,9 @@ export function ClassicTemplate({ data }: { data: InvoiceTemplateData }) {
               <Text style={s.sellerName}>
                 M/S {data.business.tradeName.toUpperCase()}
               </Text>
+              {data.business.legalName != null && (
+                <Text style={s.line}>{data.business.legalName}</Text>
+              )}
               {data.business.address != null && (
                 <Text style={s.line}>{data.business.address}</Text>
               )}

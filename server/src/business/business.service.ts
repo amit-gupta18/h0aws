@@ -36,6 +36,8 @@ export const BusinessService = {
           businessId: business.id,
           tradeName: business.tradeName,
           role: membership.role,
+          gstin: business.gstin,
+          stateCode: business.stateCode,
         },
       };
     });
