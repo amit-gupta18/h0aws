@@ -45,7 +45,7 @@ export default function LandingPage() {
                 Rakhat helps kirana stores, wholesalers, and service shops create GST invoices in seconds — no CA needed.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-10">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
                 <Link href="/signup">
                   <Button className="h-11 px-7 text-[15px] font-semibold w-full sm:w-auto">
                     Create your first invoice →
@@ -54,6 +54,20 @@ export default function LandingPage() {
                 <button className="h-11 px-6 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                   See how it works
                 </button>
+              </div>
+
+              <div className="mb-10">
+                <a
+                  href="https://pub-4b4369895e0243c5bed03042435c4106.r2.dev/application-a57c367a-9c00-4f52-a5ed-d91e14cc5c8c.apk"
+                  download
+                >
+                  <Button variant="outline" className="h-11 px-7 text-[15px] font-semibold w-full sm:w-auto">
+                    Download for Android
+                  </Button>
+                </a>
+                <p className="mt-2.5 text-xs text-muted-foreground leading-relaxed">
+                  Free download • Android only • ~90MB • After installing, tap &apos;Install anyway&apos; if prompted.
+                </p>
               </div>
 
               {/* Stats */}
