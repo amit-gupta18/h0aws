@@ -71,6 +71,7 @@ model User {
   inventoryActions    InventoryTransaction[]
   invoicesCreated     Invoice[]
   expensesCreated     Expense[]
+  purchaseBillsCreated PurchaseBill[]
   refreshTokens       RefreshToken[]
 }
 
@@ -96,6 +97,7 @@ model Business {
   invoices             Invoice[]
   inventoryTransactions InventoryTransaction[]
   expenses             Expense[]
+  purchaseBills        PurchaseBill[]
 }
 
 model BusinessMember {
@@ -275,6 +277,31 @@ model Expense {
   business  Business @relation(fields: [businessId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
 
+  @@index([businessId])
+}
+
+model PurchaseBill {
+  id                String          @id @default(uuid())
+  businessId        String
+  createdById       String
+  supplierName      String
+  supplierGstin     String?
+  supplierStateCode String?
+  billNumber        String
+  billDate          DateTime        @db.Date
+  transactionType   TransactionType @default(INTRA_STATE)
+  taxableAmount     Decimal         @db.Decimal(12, 2)
+  cgstTotal         Decimal         @db.Decimal(12, 2) @default(0)
+  sgstTotal         Decimal         @db.Decimal(12, 2) @default(0)
+  igstTotal         Decimal         @db.Decimal(12, 2) @default(0)
+  grandTotal        Decimal         @db.Decimal(12, 2)
+  notes             String?
+  createdAt         DateTime        @default(now())
+
+  business  Business @relation(fields: [businessId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@unique([businessId, billNumber])
   @@index([businessId])
 }
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Receipt,
   Users,
@@ -15,8 +15,9 @@ import {
   ChevronRight,
   Settings,
   Banknote,
+  FileCheck,
 } from 'lucide-react'
-import { sidebarItems, type SidebarItem } from '@/config/sidebar'
+import { sidebarItems, type SidebarItem, type SidebarSubItem } from '@/config/sidebar'
 import { useActiveRole, useAuthStore } from '@/store/authStore'
 import { useLogout } from '@/hooks/useAuth'
 import { useBusinesses } from '@/hooks/useBusinesses'
@@ -29,55 +30,99 @@ const iconMap: Record<string, React.ReactNode> = {
   wallet: <Wallet size={18} />,
   'bar-chart': <BarChart size={18} />,
   banknote: <Banknote size={18} />,
+  'file-check': <FileCheck size={18} />,
   'user-plus': <UserPlus size={18} />,
   settings: <Settings size={18} />,
 }
 
-function NavItem({ item, pathname }: { item: SidebarItem; pathname: string }) {
-  const router = useRouter()
-  const hasChildren = item.children && item.children.length > 0
-  const isActive = pathname.startsWith(item.href)
-  const [expanded, setExpanded] = useState(isActive)
+function parseHref(href: string) {
+  const [path, query = ''] = href.split('?')
+  return { path, params: new URLSearchParams(query) }
+}
 
-  const handleClick = () => {
-    if (hasChildren) {
-      setExpanded(!expanded)
-    } else {
-      router.push(item.href)
+function isChildActive(
+  pathname: string,
+  searchParams: URLSearchParams,
+  child: SidebarSubItem,
+  siblings: SidebarSubItem[]
+) {
+  const { path, params } = parseHref(child.href)
+
+  if ([...params.keys()].length > 0) {
+    if (!pathname.startsWith(path)) return false
+    for (const [key, value] of params.entries()) {
+      if (searchParams.get(key) !== value) return false
     }
+    return true
   }
+
+  if (pathname === path) {
+    if (path === '/dashboard/gst' && searchParams.get('tab')) return false
+    if (path === '/dashboard/inventory' && searchParams.get('tab')) return false
+    return true
+  }
+
+  // Another sibling is an exact or prefix match — prefer it over this list route
+  const siblingMatches = siblings.some((s) => {
+    if (s.href === child.href) return false
+    const siblingPath = parseHref(s.href).path
+    return pathname === siblingPath || pathname.startsWith(`${siblingPath}/`)
+  })
+  if (siblingMatches) return false
+
+  // List child stays active on detail sub-routes (e.g. /invoices/[id])
+  if (pathname.startsWith(`${path}/`)) return true
+
+  return false
+}
+
+function isGroupActive(pathname: string, item: SidebarItem) {
+  return pathname.startsWith(item.href)
+}
+
+function NavItem({
+  item,
+  pathname,
+  searchParams,
+}: {
+  item: SidebarItem
+  pathname: string
+  searchParams: URLSearchParams
+}) {
+  const groupActive = isGroupActive(pathname, item)
+  const childActive = item.children.some((c) =>
+    isChildActive(pathname, searchParams, c, item.children)
+  )
+  const [expanded, setExpanded] = useState(groupActive || childActive)
 
   return (
     <div>
       <button
-        onClick={handleClick}
+        type="button"
+        onClick={() => setExpanded(!expanded)}
         className={cn(
-          'w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-          isActive && !hasChildren
-            ? 'bg-primary text-primary-foreground'
-            : isActive
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          'w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+          groupActive || childActive ? 'bg-muted/60' : 'hover:bg-muted'
         )}
       >
         <ChevronRight
           size={14}
-          className={cn('transition-transform', expanded && 'rotate-90')}
+          className={cn('shrink-0 transition-transform text-muted-foreground', expanded && 'rotate-90')}
         />
-        {iconMap[item.icon]}
-        {item.label}
+        <span className="shrink-0 text-foreground">{iconMap[item.icon]}</span>
+        <span className="truncate font-medium text-foreground">{item.label}</span>
       </button>
-      {hasChildren && expanded && (
-        <div className="ml-5 mt-1 flex flex-col gap-1 border-l border-border pl-3">
-          {item.children!.map((child) => {
-            const childActive = pathname.startsWith(child.href)
+      {expanded && (
+        <div className="ml-3 mt-1 flex flex-col gap-0.5 border-l border-border pl-3">
+          {item.children.map((child) => {
+            const active = isChildActive(pathname, searchParams, child, item.children)
             return (
               <Link
-                key={child.href}
+                key={child.href + child.label}
                 href={child.href}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm transition-colors',
-                  childActive
+                  active
                     ? 'bg-primary text-primary-foreground font-medium'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
@@ -101,41 +146,17 @@ function SidebarSkeleton({ className, forceShow = false }: { className?: string;
       forceShow ? "flex" : "hidden md:flex",
       className
     )}>
-      {/* Business header skeleton */}
       <div className="px-5 pt-4 pb-3 border-b border-border">
-        <div
-          className="h-3 w-16 bg-muted rounded animate-pulse"
-          style={{ animationDelay: '0ms' }}
-        />
-        <div
-          className="h-4 w-28 bg-muted rounded mt-2 animate-pulse"
-          style={{ animationDelay: '50ms' }}
-        />
+        <div className="h-3 w-16 bg-muted rounded animate-pulse" />
+        <div className="h-4 w-28 bg-muted rounded mt-2 animate-pulse" />
       </div>
-
-      {/* Nav items skeleton */}
       <div className="flex flex-col gap-1 flex-1 py-4 px-3">
         {Array.from({ length: navItemCount }).map((_, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-3 rounded-md px-3 py-2 animate-pulse"
-            style={{ animationDelay: `${100 + i * 75}ms` }}
-          >
+          <div key={i} className="flex items-center gap-3 rounded-md px-3 py-2 animate-pulse">
             <div className="h-[18px] w-[18px] bg-muted rounded" />
-            <div className="h-4 bg-muted rounded" style={{ width: `${60 + (i % 3) * 20}px` }} />
+            <div className="h-4 bg-muted rounded flex-1" />
           </div>
         ))}
-      </div>
-
-      {/* Logout button skeleton */}
-      <div className="mt-auto px-3 pb-4">
-        <div
-          className="flex items-center gap-3 rounded-md px-3 py-2 animate-pulse"
-          style={{ animationDelay: `${100 + navItemCount * 75}ms` }}
-        >
-          <div className="h-[18px] w-[18px] bg-muted rounded" />
-          <div className="h-4 w-16 bg-muted rounded" />
-        </div>
       </div>
     </nav>
   )
@@ -145,6 +166,7 @@ export default function Sidebar({ className, forceShow = false }: { className?: 
   const role = useActiveRole()
   const isHydrated = useAuthStore((s) => s.isHydrated)
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
 
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
@@ -204,9 +226,14 @@ export default function Sidebar({ className, forceShow = false }: { className?: 
         </div>
       )}
 
-      <div className="flex flex-col gap-1 flex-1 py-4 px-3">
+      <div className="flex flex-col gap-1 flex-1 py-4 px-3 overflow-y-auto">
         {visibleItems.map((item) => (
-          <NavItem key={item.href} item={item} pathname={pathname} />
+          <NavItem
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            searchParams={searchParams}
+          />
         ))}
       </div>
 

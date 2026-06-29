@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { InventoryService } from "../inventory/inventory.service.js";
 import type { CreateProductInput, ListProductsQuery } from "./product.schema.js";
 
 function mapProduct(p: {
@@ -69,29 +70,40 @@ export const ProductService = {
     };
   },
 
-  async create(businessId: string, input: CreateProductInput) {
-    const product = await prisma.product.create({
-      data: {
+  async create(businessId: string, userId: string, input: CreateProductInput) {
+    const product = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
+        data: {
+          businessId,
+          name: input.name,
+          sellingPrice: input.sellingPrice,
+          gstRate: input.gstRate,
+          unit: input.unit,
+          hsnCode: input.hsnCode ?? null,
+          category: input.category ?? null,
+          quantity: input.quantity,
+          location: input.location ?? null,
+        },
+        select: {
+          id: true,
+          name: true,
+          hsnCode: true,
+          unit: true,
+          sellingPrice: true,
+          gstRate: true,
+          quantity: true,
+          location: true,
+        },
+      });
+
+      await InventoryService.recordOpeningStock(tx, {
         businessId,
-        name: input.name,
-        sellingPrice: input.sellingPrice,
-        gstRate: input.gstRate,
-        unit: input.unit,
-        hsnCode: input.hsnCode ?? null,
-        category: input.category ?? null,
+        productId: created.id,
         quantity: input.quantity,
-        location: input.location ?? null,
-      },
-      select: {
-        id: true,
-        name: true,
-        hsnCode: true,
-        unit: true,
-        sellingPrice: true,
-        gstRate: true,
-        quantity: true,
-        location: true,
-      },
+        performedById: userId,
+      });
+
+      return created;
     });
 
     return mapProduct(product);

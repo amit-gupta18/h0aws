@@ -10,6 +10,9 @@ import { productsRouter } from "./products/product.route.js";
 import { membersRouter } from "./members/member.route.js";
 import { expensesRouter } from "./expenses/expense.route.js";
 import { insightsRouter } from "./insights/insights.route.js";
+import { inventoryRouter } from "./inventory/inventory.route.js";
+import { purchasesRouter } from "./purchases/purchase.route.js";
+import { gstRouter } from "./gst/gst.route.js";
 
 const app = express();
 const PORT = process.env["PORT"] ?? 3001;
@@ -26,6 +29,9 @@ app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/members", membersRouter);
 app.use("/api/v1/expenses", expensesRouter);
 app.use("/api/v1/insights", insightsRouter);
+app.use("/api/v1/inventory", inventoryRouter);
+app.use("/api/v1/purchases", purchasesRouter);
+app.use("/api/v1/gst", gstRouter);
 
 app.get("/health", async (_req, res) => {
   try {
