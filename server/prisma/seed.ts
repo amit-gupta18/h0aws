@@ -178,14 +178,14 @@ async function seed(businessId: string) {
   // Seed some invoices
   console.log("Creating invoices...");
   const invoicesToCreate = [
-    { customerIdx: 0, items: [{ productIdx: 0, qty: 2 }, { productIdx: 2, qty: 3 }], daysAgo: 15 },
-    { customerIdx: 1, items: [{ productIdx: 4, qty: 1 }, { productIdx: 5, qty: 5 }], daysAgo: 12 },
-    { customerIdx: 2, items: [{ productIdx: 9, qty: 2 }, { productIdx: 8, qty: 10 }], daysAgo: 10 },
-    { customerIdx: 3, items: [{ productIdx: 3, qty: 1 }, { productIdx: 6, qty: 2 }], daysAgo: 7 },
-    { customerIdx: 4, items: [{ productIdx: 13, qty: 3 }, { productIdx: 12, qty: 5 }], daysAgo: 5 },
-    { customerIdx: 5, items: [{ productIdx: 11, qty: 20 }, { productIdx: 10, qty: 8 }], daysAgo: 3 },
-    { customerIdx: 0, items: [{ productIdx: 1, qty: 4 }, { productIdx: 7, qty: 10 }, { productIdx: 14, qty: 2 }], daysAgo: 2 },
-    { customerIdx: 6, items: [{ productIdx: 4, qty: 2 }], daysAgo: 1 },
+    { customerIdx: 0, items: [{ productIdx: 0, qty: 2 }, { productIdx: 2, qty: 3 }], daysAgo: 15, paymentMode: "UPI" as const },
+    { customerIdx: 1, items: [{ productIdx: 4, qty: 1 }, { productIdx: 5, qty: 5 }], daysAgo: 12, paymentMode: "CASH" as const },
+    { customerIdx: 2, items: [{ productIdx: 9, qty: 2 }, { productIdx: 8, qty: 10 }], daysAgo: 10, paymentMode: "CARD" as const },
+    { customerIdx: 3, items: [{ productIdx: 3, qty: 1 }, { productIdx: 6, qty: 2 }], daysAgo: 35, paymentMode: "CREDIT" as const },
+    { customerIdx: 4, items: [{ productIdx: 13, qty: 3 }, { productIdx: 12, qty: 5 }], daysAgo: 5, paymentMode: "UPI" as const },
+    { customerIdx: 5, items: [{ productIdx: 11, qty: 20 }, { productIdx: 10, qty: 8 }], daysAgo: 3, paymentMode: "CASH" as const },
+    { customerIdx: 0, items: [{ productIdx: 1, qty: 4 }, { productIdx: 7, qty: 10 }, { productIdx: 14, qty: 2 }], daysAgo: 2, paymentMode: "UPI" as const },
+    { customerIdx: 6, items: [{ productIdx: 4, qty: 2 }], daysAgo: 42, paymentMode: "CREDIT" as const },
   ];
 
   for (const inv of invoicesToCreate) {
@@ -272,7 +272,7 @@ async function seed(businessId: string) {
         sgstTotal,
         igstTotal,
         grandTotal,
-        paymentMode: ["CASH", "UPI", "CARD"][Math.floor(Math.random() * 3)] as "CASH" | "UPI" | "CARD",
+        paymentMode: inv.paymentMode,
         status: "ISSUED",
         saleItems: {
           create: saleItems,
@@ -284,10 +284,11 @@ async function seed(businessId: string) {
   }
 
   console.log("\nSeed completed successfully!");
-  console.log(`- ${customers.length} customers (+ local B2C)`);
+  console.log(`- ${customers.length} customers (+ local B2C, all with phones)`);
   console.log(`- ${products.length} products`);
-  console.log(`- ${invoicesToCreate.length} invoices`);
+  console.log(`- ${invoicesToCreate.length} starter invoices (incl. 2 CREDIT / overdue-ready)`);
   console.log("\nNext: npm run seed:demo --", businessId);
+  console.log("  → full FY demo for GST Intelligence, Payments, ITR, reconciliation");
 }
 
 // Get businessId from command line or environment

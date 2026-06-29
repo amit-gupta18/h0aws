@@ -2,10 +2,12 @@
  * Demo seed — invoices, purchase bills, and expenses for hackathon / GST Intelligence.
  *
  * Optimized for:
- *   · GSTR-1 (B2B + B2C + HSN) on current month
- *   · Composition advisory (FY turnover < ₹1.5Cr, intra-state only, REGULAR GST)
+ *   · GSTR-1 (B2B + B2C + B2C large > ₹2.5L + HSN) on current month
+ *   · Composition advisory (FY turnover capped below ₹1.5Cr, intra-state, REGULAR GST)
  *   · Inward register + ITC (purchase bills incl. reconciliation demo suppliers)
  *   · ITR package (monthly revenue + expense categories)
+ *   · Payments (CREDIT invoices, 30+ day overdue, customer phones for reminders)
+ *   · Inventory opening stock (when business.inventoryTracking is enabled)
  *   · Insights charts (FY trend from April 1)
  *
  * Prerequisites: business with OWNER, customers, products
@@ -16,8 +18,9 @@
  *   SEED_BUSINESS_ID   — business id (or pass as CLI arg)
  *   SEED_FRESH=1       — delete existing invoices, purchase bills, expenses first
  *   SEED_RANDOM=42     — reproducible RNG seed
- *   SEED_MIN_PER_MONTH — default 10 (demo)
- *   SEED_MAX_PER_MONTH — default 16 (demo)
+ *   SEED_MIN_PER_MONTH — default 8 (demo)
+ *   SEED_MAX_PER_MONTH — default 13 (demo)
+ *   SEED_MAX_TURNOVER  — default 13500000 (₹1.35Cr, keeps composition eligible)
  */
 
 import { PrismaClient, type Customer, type Product } from "@prisma/client";
@@ -34,7 +37,10 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const PAYMENT_MODES = ["CASH", "UPI", "CARD", "CREDIT"] as const;
-const PAYMENT_WEIGHTS = [0.28, 0.42, 0.22, 0.08];
+const PAYMENT_WEIGHTS = [0.24, 0.38, 0.16, 0.22];
+
+/** Keep FY turnover under composition ₹1.5Cr threshold */
+const DEFAULT_MAX_TURNOVER = 13_500_000;
 
 /** Matches reconciliation demo + OCR pitch suppliers */
 const DEMO_PURCHASES = [
@@ -103,10 +109,14 @@ function parseArgs() {
     process.exit(1);
   }
 
-  const minPerMonth = Math.max(1, parseInt(process.env["SEED_MIN_PER_MONTH"] ?? "10", 10));
+  const minPerMonth = Math.max(1, parseInt(process.env["SEED_MIN_PER_MONTH"] ?? "8", 10));
   const maxPerMonth = Math.max(
     minPerMonth,
-    parseInt(process.env["SEED_MAX_PER_MONTH"] ?? "16", 10)
+    parseInt(process.env["SEED_MAX_PER_MONTH"] ?? "13", 10)
+  );
+  const maxTurnover = Math.max(
+    500_000,
+    parseInt(process.env["SEED_MAX_TURNOVER"] ?? String(DEFAULT_MAX_TURNOVER), 10)
   );
   const randomSeed =
     process.env["SEED_RANDOM"] != null
@@ -114,7 +124,7 @@ function parseArgs() {
       : 42;
   const fresh = process.env["SEED_FRESH"] === "1" || process.env["SEED_FRESH"] === "true";
 
-  return { businessId, minPerMonth, maxPerMonth, randomSeed, fresh };
+  return { businessId, minPerMonth, maxPerMonth, maxTurnover, randomSeed, fresh };
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -201,7 +211,7 @@ function pickProduct(rng: () => number, products: Product[]): Product {
     (a, b) => Number(b.sellingPrice) - Number(a.sellingPrice)
   );
   const roll = rng();
-  if (roll < 0.45) {
+  if (roll < 0.28) {
     const top = sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.35)));
     return pickRandom(rng, top);
   }
@@ -301,11 +311,16 @@ async function nextInvoiceNumber(businessId: string, prefix: string) {
 }
 
 async function clearDemoData(businessId: string) {
-  console.log("SEED_FRESH=1 — clearing invoices, purchase bills, expenses…");
+  console.log("SEED_FRESH=1 — clearing invoices, purchase bills, expenses, inventory txns…");
   await prisma.saleItem.deleteMany({
     where: { invoice: { businessId } },
   });
   await prisma.invoice.deleteMany({ where: { businessId } });
+  await prisma.inventoryTransaction.deleteMany({ where: { businessId } });
+  await prisma.product.updateMany({
+    where: { businessId },
+    data: { quantity: 0 },
+  });
   await prisma.purchaseBill.deleteMany({ where: { businessId } });
   await prisma.expense.deleteMany({ where: { businessId } });
   await prisma.invoiceSequence.update({
@@ -368,6 +383,7 @@ async function seedInvoices(
   businessId: string,
   minPerMonth: number,
   maxPerMonth: number,
+  maxTurnover: number,
   randomSeed: number
 ) {
   const rng = createRng(randomSeed);
@@ -417,16 +433,22 @@ async function seedInvoices(
   console.log(
     `FY demo invoices: ${monthKey(rangeStart)} → ${monthKey(rangeEnd)} (${monthCount} months)`
   );
-  console.log(`  B2B pool: ${b2bPool.length} · B2C pool: ${b2cPool.length} · intra-state only`);
+  console.log(
+    `  B2B pool: ${b2bPool.length} · B2C pool: ${b2cPool.length} · intra-state only · turnover cap ₹${maxTurnover.toLocaleString("en-IN")}`
+  );
 
   let created = 0;
+  let skippedForCap = 0;
   let cancelled = 0;
+  let creditCount = 0;
   let b2b = 0;
   let b2c = 0;
   let walkIn = 0;
+  let runningTurnover = 0;
   const byMonth = new Map<string, number>();
 
   for (let m = 0; m < monthCount; m++) {
+    if (runningTurnover >= maxTurnover) break;
     const monthStart = startOfMonth(addMonths(rangeStart, m));
     const monthEnd =
       monthKey(monthStart) === currentMonthKey
@@ -448,8 +470,13 @@ async function seedInvoices(
     );
 
     for (let i = 0; i < count; i++) {
+      if (runningTurnover >= maxTurnover) {
+        skippedForCap++;
+        break;
+      }
+
       const dayOffset = randInt(rng, 0, daysInRange - 1);
-      const invoiceDate = new Date(monthStart);
+      let invoiceDate = new Date(monthStart);
       invoiceDate.setDate(monthStart.getDate() + dayOffset);
       if (invoiceDate > rangeEnd) invoiceDate.setTime(rangeEnd.getTime());
 
@@ -467,9 +494,21 @@ async function seedInvoices(
         refreshed.gstin
       );
 
+      if (runningTurnover + gst.summary.grandTotal > maxTurnover) {
+        skippedForCap++;
+        continue;
+      }
+
       const invoiceNumber = await nextInvoiceNumber(businessId, prefix);
       const paymentMode = pickWeighted(rng, PAYMENT_MODES, PAYMENT_WEIGHTS) as PaymentMode;
       const isCancelled = rng() < 0.02;
+
+      if (paymentMode === "CREDIT" && !isCancelled) {
+        const overdueDays = randInt(rng, 18, 55);
+        const backdated = new Date();
+        backdated.setDate(backdated.getDate() - overdueDays);
+        if (backdated < invoiceDate) invoiceDate = backdated;
+      }
 
       const createdAt = new Date(invoiceDate);
       createdAt.setHours(randInt(rng, 9, 18), randInt(rng, 0, 59), 0, 0);
@@ -502,6 +541,10 @@ async function seedInvoices(
 
       created++;
       if (isCancelled) cancelled++;
+      else {
+        runningTurnover += gst.summary.grandTotal;
+        if (paymentMode === "CREDIT") creditCount++;
+      }
       const key = monthKey(invoiceDate);
       byMonth.set(key, (byMonth.get(key) ?? 0) + 1);
 
@@ -511,7 +554,10 @@ async function seedInvoices(
 
   console.log("\nInvoices seeded.");
   console.log(`  Total: ${created} · Issued: ${created - cancelled} · Cancelled: ${cancelled}`);
-  console.log(`  B2B: ${b2b} · B2C (named): ${b2c} · Walk-in: ${walkIn}`);
+  console.log(`  B2B: ${b2b} · B2C (named): ${b2c} · Walk-in: ${walkIn} · Credit: ${creditCount}`);
+  if (skippedForCap > 0) {
+    console.log(`  Skipped (turnover cap): ${skippedForCap}`);
+  }
   for (const [key, count] of [...byMonth.entries()].sort()) {
     console.log(`    ${key}: ${count}`);
   }
@@ -641,11 +687,217 @@ async function seedExpenses(
   console.log(`Expenses seeded: ${created} (${EXPENSE_TEMPLATES.length}/month × ${monthCount} months)`);
 }
 
+async function ensureCustomerPhones(businessId: string, rng: () => number) {
+  const missing = await prisma.customer.findMany({
+    where: {
+      businessId,
+      deletedAt: null,
+      OR: [{ phone: null }, { phone: "" }],
+    },
+  });
+  for (const c of missing) {
+    await prisma.customer.update({
+      where: { id: c.id },
+      data: { phone: `98${randInt(rng, 10_000_000, 99_999_999)}` },
+    });
+  }
+  if (missing.length > 0) {
+    console.log(`Customer phones added: ${missing.length}`);
+  }
+}
+
+/** Guaranteed overdue CREDIT rows for /dashboard/payments */
+async function seedPaymentsShowcase(businessId: string, randomSeed: number) {
+  const rng = createRng(randomSeed + 3000);
+  await ensureCustomerPhones(businessId, rng);
+
+  const customers = await prisma.customer.findMany({
+    where: { businessId, deletedAt: null, phone: { not: null } },
+    orderBy: { name: "asc" },
+    take: 10,
+  });
+
+  const overdueDays = [35, 42, 38, 55, 33, 48, 40, 31];
+  let updated = 0;
+
+  for (let i = 0; i < Math.min(8, customers.length); i++) {
+    const inv = await prisma.invoice.findFirst({
+      where: {
+        businessId,
+        customerId: customers[i].id,
+        status: "ISSUED",
+        paymentMode: { not: "CREDIT" },
+      },
+      orderBy: { grandTotal: "desc" },
+    });
+    if (!inv) continue;
+
+    const d = new Date();
+    d.setDate(d.getDate() - (overdueDays[i] ?? 35));
+    await prisma.invoice.update({
+      where: { id: inv.id },
+      data: {
+        paymentMode: "CREDIT",
+        invoiceDate: toDateOnly(d),
+      },
+    });
+    updated++;
+  }
+
+  console.log(`Payments showcase: ${updated} credit invoices (30+ day overdue)`);
+}
+
+/** Walk-in B2C invoice > ₹2.5L for GSTR-1 B2C large table */
+async function seedB2cLargeInvoice(
+  businessId: string,
+  createdById: string,
+  products: Product[],
+  sellerStateCode: string,
+  sellerGSTIN: string | null,
+  defaultTemplate: string | null
+) {
+  const exists = await prisma.invoice.findFirst({
+    where: {
+      businessId,
+      status: "ISSUED",
+      customerId: null,
+      grandTotal: { gt: 250_000 },
+      invoiceDate: { gte: startOfMonth(new Date()) },
+    },
+  });
+  if (exists) {
+    console.log("B2C large invoice already present — skip");
+    return;
+  }
+
+  const monitor =
+    products.find((p) => Number(p.sellingPrice) >= 10_000) ??
+    [...products].sort((a, b) => Number(b.sellingPrice) - Number(a.sellingPrice))[0];
+  if (!monitor) return;
+
+  const quantity = Math.ceil(260_000 / (Number(monitor.sellingPrice) * 1.18));
+  const gst = calculateGST({
+    sellerGSTIN,
+    sellerStateCode,
+    buyerStateCode: sellerStateCode,
+    items: [
+      {
+        name: monitor.name,
+        quantity,
+        unitPrice: Number(monitor.sellingPrice),
+        discount: 0,
+        gstRate: Number(monitor.gstRate),
+      },
+    ],
+  });
+
+  const line = gst.lines[0];
+  const seq = await ensureInvoiceSequence(businessId);
+  const invoiceNumber = await nextInvoiceNumber(businessId, seq.prefix);
+  const invoiceDate = toDateOnly(new Date());
+
+  await prisma.invoice.create({
+    data: {
+      businessId,
+      customerId: null,
+      createdById,
+      clientBillId: randomUUID(),
+      invoiceNumber,
+      invoiceDate,
+      documentType: gst.documentType,
+      transactionType: "INTRA_STATE",
+      subtotal: gst.summary.subtotal,
+      discount: 0,
+      taxableAmount: gst.summary.taxableAmount,
+      cgstTotal: gst.summary.cgstTotal,
+      sgstTotal: gst.summary.sgstTotal,
+      igstTotal: 0,
+      grandTotal: gst.summary.grandTotal,
+      paymentMode: "UPI",
+      notes: "Demo seed — B2C large (walk-in)",
+      status: "ISSUED",
+      templateId: defaultTemplate,
+      saleItems: {
+        create: [
+          {
+            productId: monitor.id,
+            nameSnapshot: monitor.name,
+            hsnSnapshot: monitor.hsnCode,
+            unitSnapshot: monitor.unit,
+            unitPrice: Number(monitor.sellingPrice),
+            quantity,
+            discount: 0,
+            gstRate: Number(monitor.gstRate),
+            taxableValue: line.taxableValue,
+            cgstAmount: line.cgstAmount,
+            sgstAmount: line.sgstAmount,
+            igstAmount: line.igstAmount,
+            lineTotal: line.lineTotal,
+            sortOrder: 0,
+          },
+        ],
+      },
+    },
+  });
+
+  console.log(
+    `B2C large invoice: ${invoiceNumber} · ₹${gst.summary.grandTotal.toLocaleString("en-IN")} (walk-in)`
+  );
+}
+
+async function seedInventoryOpeningStock(
+  businessId: string,
+  createdById: string,
+  randomSeed: number
+) {
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { inventoryTracking: true },
+  });
+  if (!business?.inventoryTracking) return;
+
+  const products = await prisma.product.findMany({
+    where: { businessId, deletedAt: null, isActive: true },
+  });
+  const rng = createRng(randomSeed + 4000);
+  let created = 0;
+
+  for (const product of products) {
+    const existing = await prisma.inventoryTransaction.findFirst({
+      where: { businessId, productId: product.id, type: "OPENING_STOCK" },
+    });
+    if (existing) continue;
+
+    const qty = randInt(rng, 40, 180);
+    await prisma.$transaction([
+      prisma.product.update({
+        where: { id: product.id },
+        data: { quantity: qty },
+      }),
+      prisma.inventoryTransaction.create({
+        data: {
+          productId: product.id,
+          businessId,
+          quantityChange: qty,
+          type: "OPENING_STOCK",
+          performedById: createdById,
+          notes: "Demo seed opening stock",
+        },
+      }),
+    ]);
+    created++;
+  }
+
+  if (created > 0) {
+    console.log(`Inventory opening stock: ${created} products`);
+  }
+}
+
 async function printDemoSummary(businessId: string) {
   const fyStart = toDateOnly(fyStartDate());
   const today = toDateOnly(new Date());
 
-  const [revenue, gstPaid, purchases, expenses] = await Promise.all([
+  const [revenue, gstPaid, purchases, expenses, creditOutstanding] = await Promise.all([
     prisma.invoice.aggregate({
       where: {
         businessId,
@@ -672,6 +924,15 @@ async function printDemoSummary(businessId: string) {
       where: { businessId, expenseDate: { gte: fyStart, lte: today } },
       _sum: { amount: true },
     }),
+    prisma.invoice.findMany({
+      where: {
+        businessId,
+        status: "ISSUED",
+        paymentMode: "CREDIT",
+        invoiceDate: { gte: fyStart, lte: today },
+      },
+      select: { grandTotal: true, invoiceDate: true },
+    }),
   ]);
 
   const turnover = Number(revenue._sum.grandTotal ?? 0);
@@ -681,15 +942,23 @@ async function printDemoSummary(businessId: string) {
     Number(gstPaid._sum.igstTotal ?? 0);
   const compositionTax = Math.round(turnover * 0.01);
   const savings = Math.max(0, gst - compositionTax);
+  const overdueCutoff = new Date();
+  overdueCutoff.setDate(overdueCutoff.getDate() - 30);
+  const creditBalance = creditOutstanding.reduce((s, inv) => s + Number(inv.grandTotal), 0);
+  const overdueCredit = creditOutstanding.filter(
+    (inv) => new Date(inv.invoiceDate) < overdueCutoff
+  );
 
   console.log("\n── Demo readiness (current FY) ──");
-  console.log(`  Turnover (issued):  ₹${turnover.toLocaleString("en-IN")}`);
+  console.log(`  Turnover (issued):  ₹${turnover.toLocaleString("en-IN")}${turnover <= 15_000_000 ? " ✓ composition eligible" : " ⚠ over ₹1.5Cr"}`);
   console.log(`  Output GST paid:    ₹${gst.toLocaleString("en-IN")}`);
   console.log(`  Composition (1%):   ₹${compositionTax.toLocaleString("en-IN")}`);
   console.log(`  Potential savings:  ₹${savings.toLocaleString("en-IN")}`);
+  console.log(`  Credit outstanding: ${creditOutstanding.length} invoices · ₹${creditBalance.toLocaleString("en-IN")} (${overdueCredit.length} overdue)`);
   console.log(`  Purchase bills:     ${purchases._count ?? 0}`);
   console.log(`  Expenses total:     ₹${Number(expenses._sum.amount ?? 0).toLocaleString("en-IN")}`);
-  console.log("\n  Open /dashboard/gst → current month for GSTR-1 + reconciliation + ITR");
+  console.log("\n  Open /dashboard/gst → GSTR-1 · reconciliation · OCR · ITR");
+  console.log("  Open /dashboard/payments → record payment · WhatsApp reminders");
 }
 
 async function main() {
@@ -701,7 +970,10 @@ async function main() {
 
   const business = await prisma.business.findUnique({
     where: { id: args.businessId },
-    include: { members: { where: { role: "OWNER" }, take: 1 } },
+    include: {
+      members: { where: { role: "OWNER" }, take: 1 },
+      products: { where: { deletedAt: null, isActive: true } },
+    },
   });
   if (!business?.members[0]) {
     throw new Error("Business or OWNER not found");
@@ -712,10 +984,21 @@ async function main() {
     args.businessId,
     args.minPerMonth,
     args.maxPerMonth,
+    args.maxTurnover,
     args.randomSeed
+  );
+  await seedPaymentsShowcase(args.businessId, args.randomSeed);
+  await seedB2cLargeInvoice(
+    args.businessId,
+    createdById,
+    business.products,
+    business.stateCode,
+    business.gstin,
+    business.defaultTemplate
   );
   await seedPurchaseBills(args.businessId, createdById, args.randomSeed);
   await seedExpenses(args.businessId, createdById, args.randomSeed);
+  await seedInventoryOpeningStock(args.businessId, createdById, args.randomSeed);
   await printDemoSummary(args.businessId);
 
   console.log("\nDemo seed completed.");

@@ -215,33 +215,13 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Quick features */}
-        <section className="border-t border-border bg-muted/30">
-          <div className="max-w-6xl mx-auto px-5 py-10 grid grid-cols-1 sm:grid-cols-3 gap-6 md:gap-10">
-            {[
-              { icon: "⚡", title: "Invoice in 30 seconds", desc: "Pick items, add customer, done. GST auto-calculated." },
-              { icon: "🧠", title: "Compliance intelligence", desc: "OCR bills, scheme advice, ITC alerts — not just billing." },
-              { icon: "📊", title: "GSTR-ready exports", desc: "B2B, B2C, HSN summaries and CSV for your CA." },
-            ].map((f) => (
-              <div key={f.title} className="flex gap-4">
-                <div className="text-2xl mt-0.5">{f.icon}</div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        
 
         {/* GST Intelligence */}
         <section id="intelligence" className="border-t border-border py-16 lg:py-20">
           <div className="max-w-6xl mx-auto px-5">
             <div className="max-w-2xl mb-12">
               <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">GST Intelligence</p>
-              <h2 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight mb-4">
-                Vyapar removed accounting knowledge.<br className="hidden sm:block" /> Rakhat removes compliance knowledge.
-              </h2>
               <p className="text-muted-foreground text-base leading-relaxed">
                 Four capabilities inside the billing tool you already use — automation, advisory, reconciliation signals, and CA-ready document prep. Built for shopkeepers under ₹2 crore turnover.
               </p>
