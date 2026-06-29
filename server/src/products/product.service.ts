@@ -1,40 +1,76 @@
 import { prisma } from "../lib/prisma.js";
-import type { CreateProductInput } from "./product.schema.js";
+import type { CreateProductInput, ListProductsQuery } from "./product.schema.js";
+
+function mapProduct(p: {
+  id: string;
+  name: string;
+  hsnCode: string | null;
+  unit: string;
+  sellingPrice: unknown;
+  gstRate: unknown;
+  quantity: unknown;
+  location: string | null;
+}) {
+  return {
+    id: p.id,
+    name: p.name,
+    hsnCode: p.hsnCode,
+    unit: p.unit,
+    sellingPrice: Number(p.sellingPrice),
+    gstRate: Number(p.gstRate),
+    quantity: Number(p.quantity),
+    location: p.location,
+  };
+}
 
 export const ProductService = {
-  async search(businessId: string, query?: string) {
-    const where = query
+  async search(businessId: string, query: ListProductsQuery) {
+    const { page, limit, search } = query;
+    const skip = (page - 1) * limit;
+
+    const where = search
       ? {
           businessId,
           isActive: true,
           deletedAt: null,
           OR: [
-            { name: { contains: query, mode: "insensitive" as const } },
-            { sku: { contains: query, mode: "insensitive" as const } },
-            { hsnCode: { contains: query, mode: "insensitive" as const } },
+            { name: { contains: search, mode: "insensitive" as const } },
+            { sku: { contains: search, mode: "insensitive" as const } },
+            { hsnCode: { contains: search, mode: "insensitive" as const } },
           ],
         }
       : { businessId, isActive: true, deletedAt: null };
 
-    return prisma.product.findMany({
-      where,
-      take: 20,
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        hsnCode: true,
-        unit: true,
-        sellingPrice: true,
-        gstRate: true,
-        quantity: true,
-        location: true,
-      },
-    });
+    const [rows, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          hsnCode: true,
+          unit: true,
+          sellingPrice: true,
+          gstRate: true,
+          quantity: true,
+          location: true,
+        },
+      }),
+      prisma.product.count({ where }),
+    ]);
+
+    return {
+      data: rows.map(mapProduct),
+      total,
+      page,
+      limit,
+    };
   },
 
   async create(businessId: string, input: CreateProductInput) {
-    return prisma.product.create({
+    const product = await prisma.product.create({
       data: {
         businessId,
         name: input.name,
@@ -57,5 +93,7 @@ export const ProductService = {
         location: true,
       },
     });
+
+    return mapProduct(product);
   },
 };

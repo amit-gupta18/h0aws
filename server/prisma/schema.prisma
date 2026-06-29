@@ -85,6 +85,7 @@ model Business {
   phone         String?
   logoUrl       String?
   defaultTemplate InvoiceTemplate @default(CLASSIC)
+  inventoryTracking Boolean @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

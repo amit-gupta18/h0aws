@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { prisma } from "../lib/prisma.js";
 import { redis } from "../lib/redis.js";
+import { sendPasswordResetOtp } from "../lib/email.js";
 import type { MemberRole } from "@prisma/client";
 
 const BCRYPT_ROUNDS = 12;
@@ -154,24 +155,26 @@ export const AuthService = {
     await prisma.refreshToken.deleteMany({ where: { token: hashed } });
   },
 
-  async forgotPassword(phone: string): Promise<void> {
-    const user = await prisma.user.findFirst({ where: { phone } });
+  async forgotPassword(email: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user) return;
 
     const otp = generateOtp();
-    await redis.setex(`otp:${phone}`, OTP_TTL_SEC, otp);
-    console.log(`[DEV] OTP for ${phone}: ${otp}`);
+    await redis.setex(`otp:${normalizedEmail}`, OTP_TTL_SEC, otp);
+    await sendPasswordResetOtp(normalizedEmail, otp);
   },
 
-  async verifyOtp(phone: string, otp: string): Promise<string> {
-    const stored = await redis.get(`otp:${phone}`);
+  async verifyOtp(email: string, otp: string): Promise<string> {
+    const normalizedEmail = email.toLowerCase();
+    const stored = await redis.get(`otp:${normalizedEmail}`);
     if (!stored || stored !== otp) {
       throw Object.assign(new Error("Invalid or expired OTP"), { status: 400 });
     }
 
-    await redis.del(`otp:${phone}`);
+    await redis.del(`otp:${normalizedEmail}`);
 
-    const user = await prisma.user.findFirst({ where: { phone } });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user) throw Object.assign(new Error("Invalid or expired OTP"), { status: 400 });
 
     const resetToken = generateToken();

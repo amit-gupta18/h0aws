@@ -33,6 +33,7 @@ type BusinessDetail = {
   phone: string | null
   logoUrl: string | null
   invoicePrefix: string
+  inventoryTracking: boolean
   role: Role
   createdAt: string
 }
@@ -46,6 +47,7 @@ type UpdateBusinessInput = {
   stateCode?: string
   phone?: string | null
   invoicePrefix?: string
+  inventoryTracking?: boolean
 }
 
 async function apiCall<T>(fn: () => Promise<T>): Promise<T> {

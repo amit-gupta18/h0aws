@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HTTPError } from 'ky'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
@@ -22,6 +22,15 @@ type CreateCustomerInput = {
   billingAddress?: string
 }
 
+type PaginatedResponse<T> = {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+}
+
+const PAGE_SIZE = 20
+
 async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
@@ -34,6 +43,14 @@ async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+function buildListUrl(base: string, search: string, page: number) {
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  params.set('limit', String(PAGE_SIZE))
+  if (search) params.set('search', search)
+  return `${base}?${params.toString()}`
+}
+
 export function useCustomerSearch(query: string, enabled = true) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
@@ -42,8 +59,26 @@ export function useCustomerSearch(query: string, enabled = true) {
     queryKey: ['customers', activeBusinessId, 'search', query],
     queryFn: () =>
       apiCall(() =>
-        api.get(`customers${query ? `?search=${encodeURIComponent(query)}` : ''}`).json<{ data: Customer[] }>()
+        api.get(buildListUrl('customers', query, 1)).json<PaginatedResponse<Customer>>()
       ),
+    enabled: !!accessToken && !!activeBusinessId && enabled,
+    staleTime: 30000,
+  })
+}
+
+export function useInfiniteCustomers(search: string, enabled = true) {
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
+
+  return useInfiniteQuery({
+    queryKey: ['customers', activeBusinessId, 'infinite', search],
+    queryFn: ({ pageParam }) =>
+      apiCall(() =>
+        api.get(buildListUrl('customers', search, pageParam)).json<PaginatedResponse<Customer>>()
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page * lastPage.limit < lastPage.total ? lastPage.page + 1 : undefined,
     enabled: !!accessToken && !!activeBusinessId && enabled,
     staleTime: 30000,
   })
@@ -62,4 +97,4 @@ export function useCreateCustomer() {
   })
 }
 
-export type { Customer, CreateCustomerInput }
+export type { Customer, CreateCustomerInput, PaginatedResponse }

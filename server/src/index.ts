@@ -8,6 +8,8 @@ import { invoicesRouter } from "./invoices/invoice.route.js";
 import { customersRouter } from "./customers/customer.route.js";
 import { productsRouter } from "./products/product.route.js";
 import { membersRouter } from "./members/member.route.js";
+import { expensesRouter } from "./expenses/expense.route.js";
+import { insightsRouter } from "./insights/insights.route.js";
 
 const app = express();
 const PORT = process.env["PORT"] ?? 3001;
@@ -22,6 +24,8 @@ app.use("/api/v1/invoices", invoicesRouter);
 app.use("/api/v1/customers", customersRouter);
 app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/members", membersRouter);
+app.use("/api/v1/expenses", expensesRouter);
+app.use("/api/v1/insights", insightsRouter);
 
 app.get("/health", async (_req, res) => {
   try {

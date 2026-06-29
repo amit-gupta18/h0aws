@@ -12,11 +12,11 @@ export const LoginSchema = z.object({
 });
 
 export const ForgotPasswordSchema = z.object({
-  phone: z.string().regex(/^[6-9]\d{9}$/),
+  email: z.email(),
 });
 
 export const VerifyOtpSchema = z.object({
-  phone: z.string().regex(/^[6-9]\d{9}$/),
+  email: z.email(),
   otp: z.string().length(6),
 });
 

@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useRef, useDeferredValue, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateInvoice } from '@/hooks/useInvoices'
 import { useBusiness } from '@/hooks/useBusinesses'
-import { useCustomerSearch, useCreateCustomer, type Customer } from '@/hooks/useCustomers'
-import { useProductSearch, type Product } from '@/hooks/useProducts'
+import { type Customer } from '@/hooks/useCustomers'
+import { type Product } from '@/hooks/useProducts'
 import { calculateGST } from '@/lib/gst-engine'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
-import { StateSelect } from '@/components/StateSelect'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { CustomerCombobox } from '@/components/invoice/CustomerCombobox'
+import { ProductPicker } from '@/components/invoice/ProductPicker'
+import { Plus, Trash2, Save, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
 
 type LineItem = {
   id: string
@@ -22,6 +24,7 @@ type LineItem = {
   unitPrice: number
   discount: number
   gstRate: 0 | 5 | 12 | 18 | 28
+  availableStock?: number
 }
 
 const GST_RATES = [0, 5, 12, 18, 28] as const
@@ -32,12 +35,7 @@ export default function NewInvoicePage() {
   const createInvoice = useCreateInvoice()
 
   const [customerId, setCustomerId] = useState<string | undefined>()
-  const [customerName, setCustomerName] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
-  const deferredCustomerQuery = useDeferredValue(customerQuery)
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
-  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false)
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', gstin: '', stateCode: '' })
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
 
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0])
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'UPI' | 'CARD' | 'CREDIT'>('CASH')
@@ -48,22 +46,15 @@ export default function NewInvoicePage() {
   ])
 
   const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null)
-  const [productQuery, setProductQuery] = useState('')
-  const deferredProductQuery = useDeferredValue(productQuery)
 
   const memberships = useAuthStore((s) => s.memberships)
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
   const activeMembership = memberships.find((m) => m.businessId === activeBusinessId)
   const { data: business } = useBusiness(activeBusinessId)
 
+  const inventoryTracking = business?.inventoryTracking ?? false
   const sellerGSTIN = business?.gstin ?? activeMembership?.gstin ?? null
   const sellerStateCode = business?.stateCode ?? activeMembership?.stateCode ?? '00'
-
-  const { data: customersData } = useCustomerSearch(deferredCustomerQuery, !!deferredCustomerQuery)
-  const { data: productsData } = useProductSearch(deferredProductQuery, !!deferredProductQuery && activeItemIndex !== null)
-  const createCustomer = useCreateCustomer()
-
-  const selectedCustomer = customersData?.data.find((c) => c.id === customerId)
 
   const gstResult = useMemo(() => {
     return calculateGST({
@@ -79,6 +70,18 @@ export default function NewInvoicePage() {
       })),
     })
   }, [items, sellerGSTIN, sellerStateCode, selectedCustomer])
+
+  const stockMismatches = useMemo(() => {
+    if (!inventoryTracking) return []
+    return items.filter(
+      (item) =>
+        item.productId &&
+        item.availableStock !== undefined &&
+        item.quantity > item.availableStock
+    )
+  }, [items, inventoryTracking])
+
+  const hasStockMismatch = stockMismatches.length > 0
 
   const addItem = useCallback(() => {
     setItems((prev) => [
@@ -103,29 +106,24 @@ export default function NewInvoicePage() {
       unit: product.unit,
       unitPrice: product.sellingPrice,
       gstRate: product.gstRate as 0 | 5 | 12 | 18 | 28,
+      availableStock: product.quantity,
     })
-    setProductQuery('')
     setActiveItemIndex(null)
   }, [updateItem])
 
-  const selectCustomer = useCallback((customer: Customer) => {
-    setCustomerId(customer.id)
-    setCustomerName(customer.name)
-    setCustomerQuery('')
-    setShowCustomerDropdown(false)
+  const handleCustomerSelect = useCallback((customer: Customer | null) => {
+    if (customer) {
+      setCustomerId(customer.id)
+      setSelectedCustomer(customer)
+    } else {
+      setCustomerId(undefined)
+      setSelectedCustomer(null)
+    }
   }, [])
-
-  const handleCreateCustomer = async () => {
-    if (!newCustomer.name) return
-    const created = await createCustomer.mutateAsync(newCustomer)
-    selectCustomer(created)
-    setShowNewCustomerForm(false)
-    setNewCustomer({ name: '', phone: '', gstin: '', stateCode: '' })
-  }
 
   const handleSubmit = async () => {
     const validItems = items.filter((item) => item.name && item.quantity > 0)
-    if (validItems.length === 0) return
+    if (validItems.length === 0 || hasStockMismatch) return
 
     const result = await createInvoice.mutateAsync({
       clientBillId: clientBillIdRef.current,
@@ -155,101 +153,26 @@ export default function NewInvoicePage() {
         <p className="text-muted-foreground text-sm">Create a new sales invoice</p>
       </div>
 
+      {!inventoryTracking && (
+        <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
+          Billing-only mode — stock is not deducted on sales.{' '}
+          <Link href="/dashboard/settings" className="text-primary hover:underline">
+            Enable inventory tracking in Settings
+          </Link>{' '}
+          when you are ready.
+        </p>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium">Customer</label>
-            <div className="relative">
-              <input
-                type="text"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="Search customer or leave empty for walk-in"
-                value={customerId ? customerName : customerQuery}
-                onChange={(e) => {
-                  if (customerId) {
-                    setCustomerId(undefined)
-                    setCustomerName('')
-                  }
-                  setCustomerQuery(e.target.value)
-                  setShowCustomerDropdown(true)
-                }}
-                onFocus={() => setShowCustomerDropdown(true)}
-              />
-              {showCustomerDropdown && customerQuery && (
-                <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-background shadow-lg">
-                  {customersData?.data.map((customer) => (
-                    <button
-                      key={customer.id}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                      onClick={() => selectCustomer(customer)}
-                    >
-                      <div className="font-medium">{customer.name}</div>
-                      {customer.phone && <div className="text-muted-foreground text-xs">{customer.phone}</div>}
-                    </button>
-                  ))}
-                  <button
-                    className="w-full border-t px-3 py-2 text-left text-sm text-primary hover:bg-muted"
-                    onClick={() => {
-                      setShowNewCustomerForm(true)
-                      setShowCustomerDropdown(false)
-                      setNewCustomer((prev) => ({ ...prev, name: customerQuery }))
-                    }}
-                  >
-                    + Add new customer &quot;{customerQuery}&quot;
-                  </button>
-                </div>
-              )}
-            </div>
-            {customerId && (
-              <button
-                className="mt-1 text-xs text-muted-foreground hover:underline"
-                onClick={() => {
-                  setCustomerId(undefined)
-                  setCustomerName('')
-                }}
-              >
-                Clear customer (use walk-in)
-              </button>
-            )}
+            <CustomerCombobox
+              customerId={customerId}
+              customerName={selectedCustomer?.name ?? ''}
+              onSelect={handleCustomerSelect}
+            />
           </div>
-
-          {showNewCustomerForm && (
-            <div className="space-y-2 rounded-md border p-3">
-              <div className="text-sm font-medium">New Customer</div>
-              <input
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="Name *"
-                value={newCustomer.name}
-                onChange={(e) => setNewCustomer((p) => ({ ...p, name: e.target.value }))}
-              />
-              <input
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="Phone"
-                value={newCustomer.phone}
-                onChange={(e) => setNewCustomer((p) => ({ ...p, phone: e.target.value }))}
-              />
-              <input
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="GSTIN"
-                value={newCustomer.gstin}
-                onChange={(e) => setNewCustomer((p) => ({ ...p, gstin: e.target.value }))}
-              />
-              <StateSelect
-                value={newCustomer.stateCode}
-                onValueChange={(stateCode) => setNewCustomer((p) => ({ ...p, stateCode }))}
-                placeholder="Select state"
-                triggerClassName="border-border bg-background dark:bg-background"
-              />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleCreateCustomer} disabled={!newCustomer.name}>
-                  Save Customer
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setShowNewCustomerForm(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="space-y-4">
@@ -303,113 +226,122 @@ export default function NewInvoicePage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {items.map((item, index) => (
-                <tr key={item.id}>
-                  <td className="px-3 py-2">
-                    <div className="relative">
-                      <input
-                        className="w-full min-w-[150px] rounded border bg-background px-2 py-1 text-sm"
-                        placeholder="Search or type name"
-                        value={activeItemIndex === index ? productQuery : item.name}
-                        onChange={(e) => {
-                          setActiveItemIndex(index)
-                          setProductQuery(e.target.value)
-                          updateItem(item.id, { name: e.target.value, productId: undefined })
-                        }}
+              {items.map((item, index) => {
+                const stockMismatch =
+                  inventoryTracking &&
+                  item.productId &&
+                  item.availableStock !== undefined &&
+                  item.quantity > item.availableStock
+
+                return (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2">
+                      <ProductPicker
+                        value={item.name}
+                        active={activeItemIndex === index}
+                        inventoryTracking={inventoryTracking}
                         onFocus={() => setActiveItemIndex(index)}
+                        onChange={(name) =>
+                          updateItem(item.id, {
+                            name,
+                            productId: undefined,
+                            availableStock: undefined,
+                          })
+                        }
+                        onSelect={(product) => selectProduct(product, item.id)}
                       />
-                      {activeItemIndex === index && productQuery && productsData?.data.length ? (
-                        <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-background shadow-lg">
-                          {productsData.data.map((product) => (
-                            <button
-                              key={product.id}
-                              className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                              onClick={() => selectProduct(product, item.id)}
-                            >
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-muted-foreground text-xs">
-                                {product.hsnCode ? `HSN: ${product.hsnCode} | ` : ''}
-                                {product.sellingPrice.toFixed(2)} | GST: {product.gstRate}%
-                              </div>
-                            </button>
-                          ))}
+                      {stockMismatch && (
+                        <div className="mt-1 flex items-start gap-1 text-xs text-amber-600 dark:text-amber-500">
+                          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                          Only {item.availableStock} in stock — reduce quantity to continue
                         </div>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      className="w-20 rounded border bg-background px-2 py-1 text-sm"
-                      placeholder="HSN"
-                      value={item.hsn}
-                      onChange={(e) => updateItem(item.id, { hsn: e.target.value })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      className="w-16 rounded border bg-background px-2 py-1 text-sm"
-                      placeholder="Unit"
-                      value={item.unit}
-                      onChange={(e) => updateItem(item.id, { unit: e.target.value })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      className="w-16 rounded border bg-background px-2 py-1 text-right text-sm"
-                      min="0"
-                      step="0.001"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      className="w-20 rounded border bg-background px-2 py-1 text-right text-sm"
-                      min="0"
-                      step="0.01"
-                      value={item.unitPrice}
-                      onChange={(e) => updateItem(item.id, { unitPrice: parseFloat(e.target.value) || 0 })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      className="w-16 rounded border bg-background px-2 py-1 text-right text-sm"
-                      min="0"
-                      step="0.01"
-                      value={item.discount}
-                      onChange={(e) => updateItem(item.id, { discount: parseFloat(e.target.value) || 0 })}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      className="w-16 rounded border bg-background px-1 py-1 text-sm"
-                      value={item.gstRate}
-                      onChange={(e) => updateItem(item.id, { gstRate: parseInt(e.target.value) as 0 | 5 | 12 | 18 | 28 })}
-                    >
-                      {GST_RATES.map((rate) => (
-                        <option key={rate} value={rate}>
-                          {rate}%
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono">
-                    {gstResult.lines[index]?.lineTotal.toFixed(2) ?? '0.00'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => removeItem(item.id)}
-                      disabled={items.length === 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-20 rounded border bg-background px-2 py-1 text-sm"
+                        placeholder="HSN"
+                        value={item.hsn}
+                        onChange={(e) => updateItem(item.id, { hsn: e.target.value })}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-16 rounded border bg-background px-2 py-1 text-sm"
+                        placeholder="Unit"
+                        value={item.unit}
+                        onChange={(e) => updateItem(item.id, { unit: e.target.value })}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        className={`w-16 rounded border bg-background px-2 py-1 text-right text-sm ${stockMismatch ? 'border-amber-500' : ''}`}
+                        min="0"
+                        step="0.001"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        className="w-20 rounded border bg-background px-2 py-1 text-right text-sm"
+                        min="0"
+                        step="0.01"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          updateItem(item.id, { unitPrice: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        className="w-16 rounded border bg-background px-2 py-1 text-right text-sm"
+                        min="0"
+                        step="0.01"
+                        value={item.discount}
+                        onChange={(e) =>
+                          updateItem(item.id, { discount: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        className="w-16 rounded border bg-background px-1 py-1 text-sm"
+                        value={item.gstRate}
+                        onChange={(e) =>
+                          updateItem(item.id, {
+                            gstRate: parseInt(e.target.value) as 0 | 5 | 12 | 18 | 28,
+                          })
+                        }
+                      >
+                        {GST_RATES.map((rate) => (
+                          <option key={rate} value={rate}>
+                            {rate}%
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {gstResult.lines[index]?.lineTotal.toFixed(2) ?? '0.00'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => removeItem(item.id)}
+                        disabled={items.length === 1}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -477,13 +409,24 @@ export default function NewInvoicePage() {
         </div>
       </div>
 
+      {hasStockMismatch && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Resolve stock quantity mismatches before creating this invoice.
+        </div>
+      )}
+
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">
           Cancel
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={createInvoice.isPending || items.every((i) => !i.name)}
+          disabled={
+            createInvoice.isPending ||
+            items.every((i) => !i.name) ||
+            hasStockMismatch
+          }
           className="w-full sm:w-auto"
         >
           <Save className="mr-2 h-4 w-4" />

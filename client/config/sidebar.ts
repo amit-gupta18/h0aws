@@ -36,6 +36,12 @@ export const sidebarItems: SidebarItem[] = [
     roles: ['OWNER', 'ACCOUNTANT', 'VIEWER'],
   },
   {
+    label: 'Expenses',
+    href: '/dashboard/expenses',
+    icon: 'banknote',
+    roles: ['OWNER', 'ACCOUNTANT'],
+  },
+  {
     label: 'Payments',
     href: '/dashboard/payments',
     icon: 'wallet',

@@ -86,6 +86,7 @@ export const BusinessService = {
         stateCode: true,
         phone: true,
         logoUrl: true,
+        inventoryTracking: true,
         createdAt: true,
       },
     });
@@ -141,6 +142,7 @@ export const BusinessService = {
         stateCode: true,
         phone: true,
         logoUrl: true,
+        inventoryTracking: true,
       },
     });
 

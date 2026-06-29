@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { HTTPError } from 'ky'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
@@ -27,6 +27,15 @@ type CreateProductInput = {
   location?: string
 }
 
+type PaginatedResponse<T> = {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+}
+
+const PAGE_SIZE = 20
+
 async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
@@ -39,6 +48,14 @@ async function apiCall<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+function buildListUrl(base: string, search: string, page: number) {
+  const params = new URLSearchParams()
+  params.set('page', String(page))
+  params.set('limit', String(PAGE_SIZE))
+  if (search) params.set('search', search)
+  return `${base}?${params.toString()}`
+}
+
 export function useProductSearch(query: string, enabled = true) {
   const accessToken = useAuthStore((s) => s.accessToken)
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
@@ -47,8 +64,26 @@ export function useProductSearch(query: string, enabled = true) {
     queryKey: ['products', activeBusinessId, 'search', query],
     queryFn: () =>
       apiCall(() =>
-        api.get(`products${query ? `?search=${encodeURIComponent(query)}` : ''}`).json<{ data: Product[] }>()
+        api.get(buildListUrl('products', query, 1)).json<PaginatedResponse<Product>>()
       ),
+    enabled: !!accessToken && !!activeBusinessId && enabled,
+    staleTime: 30000,
+  })
+}
+
+export function useInfiniteProducts(search: string, enabled = true) {
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
+
+  return useInfiniteQuery({
+    queryKey: ['products', activeBusinessId, 'infinite', search],
+    queryFn: ({ pageParam }) =>
+      apiCall(() =>
+        api.get(buildListUrl('products', search, pageParam)).json<PaginatedResponse<Product>>()
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page * lastPage.limit < lastPage.total ? lastPage.page + 1 : undefined,
     enabled: !!accessToken && !!activeBusinessId && enabled,
     staleTime: 30000,
   })
@@ -67,4 +102,4 @@ export function useCreateProduct() {
   })
 }
 
-export type { Product, CreateProductInput }
+export type { Product, CreateProductInput, PaginatedResponse }

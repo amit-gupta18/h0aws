@@ -1,23 +1,21 @@
 import type { Request, Response } from "express";
 import { ProductService } from "./product.service.js";
-import { CreateProductSchema } from "./product.schema.js";
+import { CreateProductSchema, ListProductsQuerySchema } from "./product.schema.js";
 import { handleError } from "../common/errors.js";
 
 export const ProductController = {
   async list(req: Request, res: Response): Promise<void> {
     const businessId = req.context!.businessId;
-    const search = typeof req.query["search"] === "string" ? req.query["search"] : undefined;
+
+    const parsed = ListProductsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
 
     try {
-      const products = await ProductService.search(businessId, search);
-      res.json({
-        data: products.map((p) => ({
-          ...p,
-          sellingPrice: Number(p.sellingPrice),
-          gstRate: Number(p.gstRate),
-          quantity: Number(p.quantity),
-        })),
-      });
+      const result = await ProductService.search(businessId, parsed.data);
+      res.json(result);
     } catch (err) {
       handleError(err, res);
     }
@@ -34,12 +32,7 @@ export const ProductController = {
 
     try {
       const product = await ProductService.create(businessId, parsed.data);
-      res.status(201).json({
-        ...product,
-        sellingPrice: Number(product.sellingPrice),
-        gstRate: Number(product.gstRate),
-        quantity: Number(product.quantity),
-      });
+      res.status(201).json(product);
     } catch (err) {
       handleError(err, res);
     }
