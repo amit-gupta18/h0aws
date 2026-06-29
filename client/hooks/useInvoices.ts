@@ -27,6 +27,8 @@ type InvoiceListResponse = {
 
 type InvoiceItem = {
   id: string
+  productId?: string | null
+  stockOnHand?: number | null
   nameSnapshot: string
   hsnSnapshot: string | null
   unitSnapshot: string | null
@@ -43,6 +45,7 @@ type InvoiceItem = {
 
 type InvoiceDetail = {
   id: string
+  customerId?: string | null
   invoiceNumber: string
   invoiceDate: string
   documentType: string
@@ -82,6 +85,23 @@ type InvoiceDetail = {
 type CreateInvoiceInput = {
   clientBillId: string
   customerId?: string
+  invoiceDate: string
+  paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT'
+  templateId?: InvoiceTemplateId
+  notes?: string
+  items: {
+    productId?: string
+    name: string
+    hsn?: string
+    unit?: string
+    quantity: number
+    unitPrice: number
+    discount?: number
+    gstRate: 0 | 5 | 12 | 18 | 28
+  }[]
+}
+
+type UpdateInvoiceInput = {
   invoiceDate: string
   paymentMode: 'CASH' | 'UPI' | 'CARD' | 'CREDIT'
   templateId?: InvoiceTemplateId
@@ -167,6 +187,22 @@ export function useCreateInvoice() {
   })
 }
 
+export function useUpdateInvoice(id: string) {
+  const queryClient = useQueryClient()
+  const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
+
+  return useMutation({
+    mutationFn: (data: UpdateInvoiceInput) =>
+      apiCall(() => api.put(`invoices/${id}`, { json: data }).json<InvoiceDetail>()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeBusinessId] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeBusinessId, id] })
+      queryClient.invalidateQueries({ queryKey: ['products', activeBusinessId] })
+      queryClient.invalidateQueries({ queryKey: ['insights', activeBusinessId] })
+    },
+  })
+}
+
 export function useCancelInvoice() {
   const queryClient = useQueryClient()
   const activeBusinessId = useAuthStore((s) => s.activeBusinessId)
@@ -197,6 +233,7 @@ export type {
   InvoiceListItem,
   InvoiceDetail,
   CreateInvoiceInput,
+  UpdateInvoiceInput,
   InvoiceFilters,
   InvoiceTemplateId,
 }
