@@ -10,6 +10,7 @@
     "watch": "tsc --watch",
     "migrate": "prisma migrate deploy",
     "seed": "node --env-file=.env --import tsx/esm prisma/seed.ts",
+    "seed:invoices": "node --env-file=.env --import tsx/esm prisma/seed-invoices.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -12,6 +12,7 @@ router.post("/", requireRole("OWNER", "ACCOUNTANT"), InvoiceController.create);
 router.get("/", InvoiceController.list);
 router.get("/:id", InvoiceController.getById);
 router.get("/:id/pdf", InvoiceController.getPdf);
+router.put("/:id", requireRole("OWNER", "ACCOUNTANT"), InvoiceController.update);
 router.patch("/:id/cancel", requireRole("OWNER", "ACCOUNTANT"), InvoiceController.cancel);
 
 export { router as invoicesRouter };
