@@ -17,4 +17,11 @@ export const CreateProductSchema = z.object({
   location: z.string().optional(), // free-text label, e.g. "Shelf A / Warehouse"
 });
 
+export const ListProductsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+  search: z.string().optional(),
+});
+
 export type CreateProductInput = z.infer<typeof CreateProductSchema>;
+export type ListProductsQuery = z.infer<typeof ListProductsQuerySchema>;

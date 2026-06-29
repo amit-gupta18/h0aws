@@ -129,8 +129,8 @@ export const AuthController = {
       return;
     }
     try {
-      await AuthService.forgotPassword(parsed.data.phone);
-      res.json({ message: "If that phone is registered, an OTP has been sent" });
+      await AuthService.forgotPassword(parsed.data.email);
+      res.json({ message: "If that email is registered, an OTP has been sent" });
     } catch (err) {
       handleError(err, res);
     }
@@ -143,7 +143,7 @@ export const AuthController = {
       return;
     }
     try {
-      const resetToken = await AuthService.verifyOtp(parsed.data.phone, parsed.data.otp);
+      const resetToken = await AuthService.verifyOtp(parsed.data.email, parsed.data.otp);
       res.json({ resetToken });
     } catch (err) {
       handleError(err, res);

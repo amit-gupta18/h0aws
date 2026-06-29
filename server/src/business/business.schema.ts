@@ -20,6 +20,7 @@ export const UpdateBusinessSchema = z.object({
   stateCode: z.string().length(2).optional(),
   phone: z.string().regex(/^[6-9]\d{9}$/).nullable().optional(),
   invoicePrefix: z.string().min(1).max(10).optional(),
+  inventoryTracking: z.boolean().optional(),
 });
 
 export type CreateBusinessInput = z.infer<typeof CreateBusinessSchema>;

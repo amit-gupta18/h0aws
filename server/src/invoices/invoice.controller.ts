@@ -64,11 +64,12 @@ export const InvoiceController = {
   },
 
   async cancel(req: Request, res: Response): Promise<void> {
+    const userId = req.user!.userId;
     const businessId = req.context!.businessId;
     const invoiceId = req.params["id"] as string;
 
     try {
-      const result = await InvoiceService.cancel(businessId, invoiceId);
+      const result = await InvoiceService.cancel(businessId, invoiceId, userId);
       res.json(result);
     } catch (err) {
       handleError(err, res);

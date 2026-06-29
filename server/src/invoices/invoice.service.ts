@@ -4,11 +4,23 @@ import { uploadPdf, deletePdf, pdfExists, getPresignedUrl } from "../lib/r2.js";
 import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { getTemplate, type InvoiceTemplateData } from "./templates/index.js";
+import { InventoryService } from "../inventory/inventory.service.js";
 import type { CreateInvoiceInput, ListInvoicesQuery } from "./invoice.schema.js";
 import type { Prisma } from "@prisma/client";
 
 function getR2Key(businessId: string, invoiceId: string): string {
   return `invoices/${businessId}/${invoiceId}.pdf`;
+}
+
+function aggregateProductQuantities(
+  items: { productId?: string | undefined; quantity: number }[]
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const item of items) {
+    if (!item.productId) continue;
+    map.set(item.productId, (map.get(item.productId) ?? 0) + item.quantity);
+  }
+  return map;
 }
 
 export const InvoiceService = {
@@ -32,6 +44,7 @@ export const InvoiceService = {
         phone: true,
         logoUrl: true,
         defaultTemplate: true,
+        inventoryTracking: true,
       },
     });
 
@@ -119,6 +132,19 @@ export const InvoiceService = {
       }));
 
       await tx.saleItem.createMany({ data: saleItemsData });
+
+      if (business.inventoryTracking) {
+        const productQuantities = aggregateProductQuantities(input.items);
+        for (const [productId, quantity] of productQuantities) {
+          await InventoryService.deductForSale(tx, {
+            businessId,
+            productId,
+            quantity,
+            sourceId: inv.id,
+            performedById: userId,
+          });
+        }
+      }
 
       return inv;
     });
@@ -390,9 +416,16 @@ export const InvoiceService = {
     return { url: await getPresignedUrl(r2Key) };
   },
 
-  async cancel(businessId: string, invoiceId: string) {
+  async cancel(businessId: string, invoiceId: string, userId: string) {
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, businessId },
+      include: {
+        business: { select: { inventoryTracking: true } },
+        saleItems: {
+          where: { productId: { not: null } },
+          select: { productId: true, quantity: true },
+        },
+      },
     });
 
     if (!invoice) {
@@ -407,9 +440,31 @@ export const InvoiceService = {
       throw err;
     }
 
-    await prisma.invoice.update({
-      where: { id: invoiceId },
-      data: { status: "CANCELLED" },
+    await prisma.$transaction(async (tx) => {
+      if (invoice.business.inventoryTracking) {
+        const productQuantities = new Map<string, number>();
+        for (const item of invoice.saleItems) {
+          if (!item.productId) continue;
+          const qty = Number(item.quantity);
+          productQuantities.set(item.productId, (productQuantities.get(item.productId) ?? 0) + qty);
+        }
+
+        for (const [productId, quantity] of productQuantities) {
+          await InventoryService.restoreForCancel(tx, {
+            businessId,
+            productId,
+            quantity,
+            sourceId: invoiceId,
+            performedById: userId,
+            notes: `Restored from cancelled invoice ${invoice.invoiceNumber}`,
+          });
+        }
+      }
+
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: { status: "CANCELLED" },
+      });
     });
 
     try {

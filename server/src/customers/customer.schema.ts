@@ -8,4 +8,11 @@ export const CreateCustomerSchema = z.object({
   billingAddress: z.string().optional(),
 });
 
+export const ListCustomersQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(50).default(20),
+  search: z.string().optional(),
+});
+
 export type CreateCustomerInput = z.infer<typeof CreateCustomerSchema>;
+export type ListCustomersQuery = z.infer<typeof ListCustomersQuerySchema>;
