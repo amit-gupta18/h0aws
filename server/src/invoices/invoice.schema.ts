@@ -39,4 +39,14 @@ export const ListInvoicesQuerySchema = z.object({
 
 export type SaleItemInput = z.infer<typeof SaleItemSchema>;
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceSchema>;
+
+export const UpdateInvoiceSchema = z.object({
+  invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  paymentMode: z.enum(["CASH", "UPI", "CARD", "CREDIT"]),
+  templateId: z.enum(["CLASSIC", "MODERN", "COMPACT"]).optional(),
+  notes: z.string().optional(),
+  items: z.array(SaleItemSchema).min(1),
+});
+
+export type UpdateInvoiceInput = z.infer<typeof UpdateInvoiceSchema>;
 export type ListInvoicesQuery = z.infer<typeof ListInvoicesQuerySchema>;

@@ -5,7 +5,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
 import { getTemplate, type InvoiceTemplateData } from "./templates/index.js";
 import { InventoryService } from "../inventory/inventory.service.js";
-import type { CreateInvoiceInput, ListInvoicesQuery } from "./invoice.schema.js";
+import type { CreateInvoiceInput, ListInvoicesQuery, UpdateInvoiceInput } from "./invoice.schema.js";
 import type { Prisma } from "@prisma/client";
 
 function getR2Key(businessId: string, invoiceId: string): string {
@@ -304,7 +304,10 @@ export const InvoiceService = {
             stateCode: true,
           },
         },
-        saleItems: { orderBy: { sortOrder: "asc" } },
+        saleItems: {
+          orderBy: { sortOrder: "asc" },
+          include: { product: { select: { quantity: true } } },
+        },
       },
     });
 
@@ -316,6 +319,7 @@ export const InvoiceService = {
 
     return {
       id: invoice.id,
+      customerId: invoice.customerId,
       invoiceNumber: invoice.invoiceNumber,
       invoiceDate: invoice.invoiceDate.toISOString().slice(0, 10),
       documentType: invoice.documentType,
@@ -324,6 +328,8 @@ export const InvoiceService = {
       customer: invoice.customer,
       items: invoice.saleItems.map((si) => ({
         id: si.id,
+        productId: si.productId,
+        stockOnHand: si.product ? Number(si.product.quantity) : null,
         nameSnapshot: si.nameSnapshot,
         hsnSnapshot: si.hsnSnapshot,
         unitSnapshot: si.unitSnapshot,
@@ -414,6 +420,189 @@ export const InvoiceService = {
     });
 
     return { url: await getPresignedUrl(r2Key) };
+  },
+
+  async update(businessId: string, invoiceId: string, userId: string, input: UpdateInvoiceInput) {
+    const existing = await prisma.invoice.findFirst({
+      where: { id: invoiceId, businessId },
+      include: {
+        customer: {
+          select: { id: true, name: true, gstin: true, stateCode: true, billingAddress: true },
+        },
+        saleItems: true,
+        business: {
+          select: {
+            tradeName: true,
+            legalName: true,
+            gstin: true,
+            address: true,
+            stateCode: true,
+            phone: true,
+            logoUrl: true,
+            defaultTemplate: true,
+            inventoryTracking: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      const err = new Error("Invoice not found") as Error & { status: number };
+      err.status = 404;
+      throw err;
+    }
+
+    if (existing.status === "CANCELLED") {
+      const err = new Error("Cannot edit a cancelled invoice") as Error & { status: number };
+      err.status = 400;
+      throw err;
+    }
+
+    const business = existing.business;
+    const customer = existing.customer;
+    const templateId = input.templateId ?? existing.templateId;
+
+    const gstResult = calculateGST({
+      sellerGSTIN: business.gstin,
+      sellerStateCode: business.stateCode,
+      buyerStateCode: customer?.stateCode ?? null,
+      items: input.items.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount ?? 0,
+        gstRate: item.gstRate,
+      })),
+    });
+
+    await prisma.$transaction(async (tx) => {
+      if (business.inventoryTracking) {
+        const oldQuantities = aggregateProductQuantities(
+          existing.saleItems.map((si) => ({
+            productId: si.productId ?? undefined,
+            quantity: Number(si.quantity),
+          }))
+        );
+        for (const [productId, quantity] of oldQuantities) {
+          await InventoryService.restoreForCancel(tx, {
+            businessId,
+            productId,
+            quantity,
+            sourceId: invoiceId,
+            performedById: userId,
+            notes: `Restored for edit of invoice ${existing.invoiceNumber}`,
+          });
+        }
+      }
+
+      await tx.saleItem.deleteMany({ where: { invoiceId } });
+
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          invoiceDate: new Date(input.invoiceDate),
+          documentType: gstResult.documentType,
+          transactionType: gstResult.transactionType,
+          subtotal: gstResult.summary.subtotal,
+          discount: gstResult.summary.discountTotal,
+          taxableAmount: gstResult.summary.taxableAmount,
+          cgstTotal: gstResult.summary.cgstTotal,
+          sgstTotal: gstResult.summary.sgstTotal,
+          igstTotal: gstResult.summary.igstTotal,
+          grandTotal: gstResult.summary.grandTotal,
+          paymentMode: input.paymentMode,
+          notes: input.notes ?? null,
+          templateId,
+        },
+      });
+
+      const saleItemsData = input.items.map((item, idx) => ({
+        invoiceId,
+        productId: item.productId ?? null,
+        nameSnapshot: item.name,
+        hsnSnapshot: item.hsn ?? null,
+        unitSnapshot: item.unit ?? "PCS",
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        discount: item.discount ?? 0,
+        gstRate: item.gstRate,
+        taxableValue: gstResult.lines[idx]!.taxableValue,
+        cgstAmount: gstResult.lines[idx]!.cgstAmount,
+        sgstAmount: gstResult.lines[idx]!.sgstAmount,
+        igstAmount: gstResult.lines[idx]!.igstAmount,
+        lineTotal: gstResult.lines[idx]!.lineTotal,
+        sortOrder: idx,
+      }));
+
+      await tx.saleItem.createMany({ data: saleItemsData });
+
+      if (business.inventoryTracking) {
+        const newQuantities = aggregateProductQuantities(input.items);
+        for (const [productId, quantity] of newQuantities) {
+          await InventoryService.deductForSale(tx, {
+            businessId,
+            productId,
+            quantity,
+            sourceId: invoiceId,
+            performedById: userId,
+          });
+        }
+      }
+    });
+
+    const updated = await this.getById(businessId, invoiceId);
+
+    try {
+      const templateData: InvoiceTemplateData = {
+        invoiceNumber: updated.invoiceNumber,
+        invoiceDate: updated.invoiceDate,
+        documentType: updated.documentType,
+        transactionType: updated.transactionType,
+        paymentMode: updated.paymentMode,
+        notes: updated.notes,
+        business: updated.business,
+        customer: updated.customer,
+        items: updated.items.map((si) => ({
+          nameSnapshot: si.nameSnapshot,
+          hsnSnapshot: si.hsnSnapshot,
+          unitSnapshot: si.unitSnapshot,
+          quantity: si.quantity,
+          unitPrice: si.unitPrice,
+          discount: si.discount,
+          gstRate: si.gstRate,
+          taxableValue: si.taxableValue,
+          cgstAmount: si.cgstAmount,
+          sgstAmount: si.sgstAmount,
+          igstAmount: si.igstAmount,
+          lineTotal: si.lineTotal,
+        })),
+        subtotal: updated.subtotal,
+        discount: updated.discountTotal,
+        taxableAmount: updated.taxableAmount,
+        cgstTotal: updated.cgstTotal,
+        sgstTotal: updated.sgstTotal,
+        igstTotal: updated.igstTotal,
+        grandTotal: updated.grandTotal,
+      };
+
+      const pdfBuffer = await renderToBuffer(
+        React.createElement(getTemplate(updated.templateId), {
+          data: templateData,
+        }) as any
+      );
+
+      const r2Key = getR2Key(businessId, invoiceId);
+      await uploadPdf(r2Key, Buffer.from(pdfBuffer));
+
+      await prisma.invoice.update({
+        where: { id: invoiceId },
+        data: { pdfUrl: r2Key },
+      });
+    } catch (err) {
+      console.error("PDF regeneration failed:", err);
+    }
+
+    return this.getById(businessId, invoiceId);
   },
 
   async cancel(businessId: string, invoiceId: string, userId: string) {

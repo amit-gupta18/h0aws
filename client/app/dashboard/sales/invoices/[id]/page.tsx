@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useInvoice, useCancelInvoice, useInvoicePdf } from '@/hooks/useInvoices'
 import { useActiveRole } from '@/store/authStore'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { getTemplate, type InvoiceTemplateData } from '@/components/templates'
-import { ArrowLeft, Download, XCircle } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, Download, XCircle, Pencil } from 'lucide-react'
 
 const PDFViewer = dynamic(
   () => import('@react-pdf/renderer').then((m) => m.PDFViewer),
@@ -118,6 +119,19 @@ export default function InvoiceDetailPage() {
 
           {invoice.status === 'ISSUED' && (
             <>
+              {canCancel && (
+                <Link
+                  href={`/dashboard/sales/invoices/${id}/edit`}
+                  className={buttonVariants({
+                    variant: 'outline',
+                    className: 'w-full shrink-0 sm:w-auto',
+                  })}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Invoice
+                </Link>
+              )}
+
               <Button variant="outline" onClick={handleDownload} className="w-full shrink-0 sm:w-auto">
                 <Download className="mr-2 h-4 w-4" />
                 Download PDF

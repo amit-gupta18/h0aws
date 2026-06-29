@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 import { InvoiceService } from "./invoice.service.js";
-import { CreateInvoiceSchema, ListInvoicesQuerySchema } from "./invoice.schema.js";
+import {
+  CreateInvoiceSchema,
+  ListInvoicesQuerySchema,
+  UpdateInvoiceSchema,
+} from "./invoice.schema.js";
 import { handleError } from "../common/errors.js";
 
 export const InvoiceController = {
@@ -58,6 +62,25 @@ export const InvoiceController = {
     try {
       const result = await InvoiceService.generatePdf(businessId, invoiceId);
       res.json(result);
+    } catch (err) {
+      handleError(err, res);
+    }
+  },
+
+  async update(req: Request, res: Response): Promise<void> {
+    const userId = req.user!.userId;
+    const businessId = req.context!.businessId;
+    const invoiceId = req.params["id"] as string;
+
+    const parsed = UpdateInvoiceSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+
+    try {
+      const invoice = await InvoiceService.update(businessId, invoiceId, userId, parsed.data);
+      res.json(invoice);
     } catch (err) {
       handleError(err, res);
     }
