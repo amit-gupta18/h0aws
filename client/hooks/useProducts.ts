@@ -98,6 +98,7 @@ export function useCreateProduct() {
       apiCall(() => api.post('products', { json: data }).json<Product>()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products', activeBusinessId] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-transactions', activeBusinessId] })
     },
   })
 }

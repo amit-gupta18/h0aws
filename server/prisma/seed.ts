@@ -104,6 +104,38 @@ async function seed(businessId: string) {
 
   console.log(`Found business: ${business.tradeName}`);
 
+  // Ensure business is demo-ready for GST Intelligence
+  await prisma.business.update({
+    where: { id: businessId },
+    data: {
+      gstinType: "REGULAR",
+      gstin: business.gstin ?? "27AABCU9603R1ZM",
+    },
+  });
+
+  // Local B2C buyers (same state, no GSTIN) for GSTR-1 B2C split
+  const localB2c = [
+    { name: "Walk-in Retail", phone: "9812345670" },
+    { name: "Local Shop Buyer", phone: "9823456781" },
+    { name: "Counter Customer", phone: "9834567892" },
+  ];
+  for (const c of localB2c) {
+    const exists = await prisma.customer.findFirst({
+      where: { businessId, name: c.name, deletedAt: null },
+    });
+    if (!exists) {
+      await prisma.customer.create({
+        data: {
+          businessId,
+          name: c.name,
+          phone: c.phone,
+          stateCode: business.stateCode,
+          billingAddress: `Local, state ${business.stateCode}`,
+        },
+      });
+    }
+  }
+
   // Seed customers
   console.log("Creating customers...");
   const customers = await Promise.all(
@@ -252,9 +284,10 @@ async function seed(businessId: string) {
   }
 
   console.log("\nSeed completed successfully!");
-  console.log(`- ${customers.length} customers`);
+  console.log(`- ${customers.length} customers (+ local B2C)`);
   console.log(`- ${products.length} products`);
   console.log(`- ${invoicesToCreate.length} invoices`);
+  console.log("\nNext: npm run seed:demo --", businessId);
 }
 
 // Get businessId from command line or environment

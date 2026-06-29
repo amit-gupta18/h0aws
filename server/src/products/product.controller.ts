@@ -23,6 +23,7 @@ export const ProductController = {
 
   async create(req: Request, res: Response): Promise<void> {
     const businessId = req.context!.businessId;
+    const userId = req.user!.userId;
 
     const parsed = CreateProductSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -31,7 +32,7 @@ export const ProductController = {
     }
 
     try {
-      const product = await ProductService.create(businessId, parsed.data);
+      const product = await ProductService.create(businessId, userId, parsed.data);
       res.status(201).json(product);
     } catch (err) {
       handleError(err, res);
