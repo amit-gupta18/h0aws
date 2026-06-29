@@ -35,13 +35,13 @@ export default function DashboardHome() {
   const monthName = useMemo(() => getMonthName(), [])
 
   const { data: recentData, isLoading: recentLoading } = useInvoices({ limit: 5 })
-  const { data: monthData, isLoading: monthLoading } = useInvoices({ from, to, limit: 100 })
+  const { data: monthData, isLoading: monthLoading } = useInvoices({ from, to, limit: 100, status: 'ISSUED' })
   const { data: customersData, isLoading: customersLoading } = useCustomerSearch('')
 
   const recentInvoices = recentData?.data ?? []
   const monthInvoices = monthData?.data ?? []
   const totalInvoices = recentData?.total ?? 0
-  const totalCustomers = customersData?.data?.length ?? 0
+  const totalCustomers = customersData?.total ?? 0
 
   const monthRevenue = monthInvoices.reduce((s, i) => s + i.grandTotal, 0)
   const monthInvoiceCount = monthInvoices.length

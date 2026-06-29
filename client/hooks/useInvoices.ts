@@ -161,6 +161,8 @@ export function useCreateInvoice() {
       apiCall(() => api.post('invoices', { json: data }).json<InvoiceDetail>()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeBusinessId] })
+      queryClient.invalidateQueries({ queryKey: ['products', activeBusinessId] })
+      queryClient.invalidateQueries({ queryKey: ['insights', activeBusinessId] })
     },
   })
 }
@@ -175,6 +177,7 @@ export function useCancelInvoice() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeBusinessId] })
       queryClient.invalidateQueries({ queryKey: ['invoices', activeBusinessId, id] })
+      queryClient.invalidateQueries({ queryKey: ['products', activeBusinessId] })
     },
   })
 }

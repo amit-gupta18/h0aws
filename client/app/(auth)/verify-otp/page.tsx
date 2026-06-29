@@ -8,13 +8,13 @@ import { Button } from '@/components/ui/button'
 function VerifyOtpForm() {
   const router = useRouter()
   const params = useSearchParams()
-  const phone = params.get('phone') ?? ''
+  const email = params.get('email') ?? ''
   const verifyOtp = useVerifyOtp()
   const [otp, setOtp] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const data = await verifyOtp.mutateAsync({ phone, otp })
+    const data = await verifyOtp.mutateAsync({ email, otp })
     router.push(`/reset-password?token=${encodeURIComponent(data.resetToken)}`)
   }
 
@@ -25,7 +25,7 @@ function VerifyOtpForm() {
           <h1 className="text-xl font-semibold text-foreground">Enter OTP</h1>
           <p className="text-sm text-muted-foreground">
             A 6-digit code was sent to{' '}
-            <span className="font-medium text-foreground">{phone}</span>.
+            <span className="font-medium text-foreground">{email}</span>.
           </p>
         </div>
 

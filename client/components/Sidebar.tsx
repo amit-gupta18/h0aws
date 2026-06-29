@@ -14,6 +14,7 @@ import {
   Building2,
   ChevronRight,
   Settings,
+  Banknote,
 } from 'lucide-react'
 import { sidebarItems, type SidebarItem } from '@/config/sidebar'
 import { useActiveRole, useAuthStore } from '@/store/authStore'
@@ -27,6 +28,7 @@ const iconMap: Record<string, React.ReactNode> = {
   box: <Box size={18} />,
   wallet: <Wallet size={18} />,
   'bar-chart': <BarChart size={18} />,
+  banknote: <Banknote size={18} />,
   'user-plus': <UserPlus size={18} />,
   settings: <Settings size={18} />,
 }

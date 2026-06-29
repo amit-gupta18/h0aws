@@ -23,6 +23,7 @@ export default function SettingsPage() {
     stateCode: '',
     phone: '',
     invoicePrefix: '',
+    inventoryTracking: false,
   })
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function SettingsPage() {
         stateCode: business.stateCode,
         phone: business.phone ?? '',
         invoicePrefix: business.invoicePrefix,
+        inventoryTracking: business.inventoryTracking ?? false,
       })
     }
   }, [business])
@@ -57,6 +59,7 @@ export default function SettingsPage() {
         stateCode: formData.stateCode,
         phone: formData.phone || null,
         invoicePrefix: formData.invoicePrefix,
+        inventoryTracking: formData.inventoryTracking,
       },
     })
   }
@@ -230,6 +233,33 @@ export default function SettingsPage() {
               </select>
             </div>
           </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-5">
+          <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
+            Inventory
+          </h2>
+
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-1"
+              disabled={!isOwner}
+              checked={formData.inventoryTracking}
+              onChange={(e) =>
+                setFormData({ ...formData, inventoryTracking: e.target.checked })
+              }
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">
+                Track inventory on sales
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                When off, invoices work independently and stock is not deducted. When on,
+                selling a catalog item reduces stock and warns if quantity exceeds available stock.
+              </p>
+            </div>
+          </label>
         </div>
 
         <div className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-5">

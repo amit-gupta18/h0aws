@@ -76,7 +76,7 @@ export function useLogout() {
 
 export function useForgotPassword() {
   return useMutation({
-    mutationFn: (data: { phone: string }) =>
+    mutationFn: (data: { email: string }) =>
       apiCall(() =>
         api.post('auth/forgot-password', { json: data }).json<{ message: string }>()
       ),
@@ -85,7 +85,7 @@ export function useForgotPassword() {
 
 export function useVerifyOtp() {
   return useMutation({
-    mutationFn: (data: { phone: string; otp: string }) =>
+    mutationFn: (data: { email: string; otp: string }) =>
       apiCall(() =>
         api.post('auth/verify-otp', { json: data }).json<{ resetToken: string }>()
       ),

@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button'
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const forgotPassword = useForgotPassword()
-  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await forgotPassword.mutateAsync({ phone })
-    router.push(`/verify-otp?phone=${encodeURIComponent(phone)}`)
+    await forgotPassword.mutateAsync({ email })
+    router.push(`/verify-otp?email=${encodeURIComponent(email)}`)
   }
 
   return (
@@ -23,24 +23,24 @@ export default function ForgotPasswordPage() {
         <div className="space-y-1">
           <h1 className="text-xl font-semibold text-foreground">Reset your password</h1>
           <p className="text-sm text-muted-foreground">
-            Enter your phone number and we&apos;ll send you a one-time code.
+            Enter your email and we&apos;ll send you a one-time code.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground" htmlFor="phone">
-              Phone number
+            <label className="text-sm font-medium text-foreground" htmlFor="email">
+              Email
             </label>
             <input
-              id="phone"
-              type="tel"
-              autoComplete="tel"
+              id="email"
+              type="email"
+              autoComplete="email"
               required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              placeholder="10-digit mobile number"
+              placeholder="you@example.com"
             />
           </div>
 
